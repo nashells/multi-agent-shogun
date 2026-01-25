@@ -37,21 +37,35 @@ Chairman (Human)
 
 ## Quick Start
 
+### Prerequisites
+- WSL2 (Ubuntu recommended)
+- tmux
+- Claude Code CLI
+
+### Setup (WSL)
+
 ```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/claude-shogun.git
-cd claude-shogun
+# Clone to Windows directory (recommended for VSCode access)
+git clone https://github.com/YOUR_USERNAME/claude-shogun.git /mnt/c/tools/claude-shogun
 
-# Run setup
+# Create symlink from WSL home (for easy access)
+ln -s /mnt/c/tools/claude-shogun ~/claude-shogun
+
+# Navigate and run setup
+cd ~/claude-shogun
 ./setup.sh
+```
 
-# Attach to Shogun session
+### Deployment
+
+```bash
+# 【壱】Attach to Shogun session
 tmux attach-session -t shogun
 
-# Start Claude Code
+# 【弐】Start Claude Code
 claude --dangerously-skip-permissions
 
-# Give the command
+# 【参】Give the order
 # "You are the Shogun. Read instructions/shogun.md and follow the instructions."
 ```
 

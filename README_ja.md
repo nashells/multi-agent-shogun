@@ -38,21 +38,35 @@ claude-shogunは、以下の階層構造で複数のClaude Codeエージェン�
 
 ## クイックスタート
 
+### 必要環境
+- WSL2（Ubuntu推奨）
+- tmux
+- Claude Code CLI
+
+### セットアップ（WSL）
+
 ```bash
-# リポジトリをクローン
-git clone https://github.com/YOUR_USERNAME/claude-shogun.git
-cd claude-shogun
+# Windowsディレクトリにクローン（VSCodeアクセス用に推奨）
+git clone https://github.com/YOUR_USERNAME/claude-shogun.git /mnt/c/tools/claude-shogun
 
-# セットアップ実行
+# WSLホームからシンボリックリンク作成（簡単アクセス用）
+ln -s /mnt/c/tools/claude-shogun ~/claude-shogun
+
+# 移動してセットアップ実行
+cd ~/claude-shogun
 ./setup.sh
+```
 
-# 将軍セッションに入る
+### 出陣手順
+
+```bash
+# 【壱】将軍の本陣に参上
 tmux attach-session -t shogun
 
-# Claude Code起動
+# 【弐】Claude Codeを召喚
 claude --dangerously-skip-permissions
 
-# 以下のように命令する
+# 【参】出陣を命ず
 # 「汝は将軍なり。instructions/shogun.mdを読み、指示に従え」
 ```
 
