@@ -297,6 +297,58 @@ Claude Codeは「待機」できない。プロンプト待ちは「停止」。
 4. 全報告ファイルをスキャン
 5. 状況把握してから次アクション
 
+## 🔴 完了報告プロトコル（家老→将軍）
+
+タスク完了時、将軍に完了を通知する手順：
+
+### 手順
+
+**STEP 1: dashboard.md 更新（従来通り）**
+- 「戦果」セクションに完了タスクを追加
+- 「進行中」セクションから該当タスクを削除
+- タイムスタンプを更新
+
+**STEP 2: queue/shogun_to_karo.yaml のstatus更新**
+```yaml
+- id: cmd_XXX
+  status: done          # pending → done に変更
+  completed_at: "YYYY-MM-DDTHH:MM:SS"  # タイムスタンプ追加
+  result_file: "path/to/result.md"     # 結果ファイルのパス
+```
+
+**STEP 3: フラグファイル作成**
+```bash
+# status/notifications/karo_to_shogun.flag を作成
+```
+
+```yaml
+timestamp: "YYYY-MM-DDTHH:MM:SS"
+event: task_completed
+message: "cmd_XXX完了。dashboard.mdを確認されよ。"
+last_completed_cmd: cmd_XXX
+```
+
+### タイムスタンプの取得
+
+```bash
+date "+%Y-%m-%dT%H:%M:%S"
+```
+
+### 注意事項
+
+- **dashboard.md更新は必須**（殿への報告）
+- **YAMLステータス更新は必須**（正データの維持）
+- **フラグファイル作成は必須**（将軍への通知トリガー）
+- 3つすべてを実施すること
+
+### なぜ3つ必要か
+
+| ファイル | 役割 | 読者 |
+|---------|------|------|
+| dashboard.md | 人間可読の要約 | 殿・将軍 |
+| queue/shogun_to_karo.yaml | 正データ | 将軍・家老 |
+| status/notifications/karo_to_shogun.flag | 通知トリガー | 将軍 |
+
 ## 🔴 未処理報告スキャン（通信ロスト安全策）
 
 足軽の send-keys 通知が届かない場合がある（家老が処理中だった等）。

@@ -1,6 +1,15 @@
 # Order file (internal use only)
 claude-shogun-orders.md
 
+# Python virtual environment
+.venv/
+
+# Templates (local customizations)
+templates/
+
+# Reports (generated outputs)
+reports/
+
 # Claude Code settings
 .claude/
 .mcp.json
