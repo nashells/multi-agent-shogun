@@ -19,9 +19,41 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import re
 import yaml
 import msal
 import requests
+
+
+def sanitize_sensitive_data(text: str) -> str:
+    """
+    Sanitize sensitive information from log messages.
+
+    Args:
+        text: Text that may contain sensitive information
+
+    Returns:
+        Sanitized text with sensitive data masked
+    """
+    if not text:
+        return text
+
+    # Patterns to sanitize
+    patterns = [
+        (r'(access[_-]?token[":\s]+)([^\s",}]+)', r'\1***REDACTED***'),
+        (r'(bearer\s+)([^\s",}]+)', r'\1***REDACTED***', re.IGNORECASE),
+        (r'(client[_-]?secret[":\s]+)([^\s",}]+)', r'\1***REDACTED***'),
+        (r'(password[":\s]+)([^\s",}]+)', r'\1***REDACTED***'),
+        (r'(secret[":\s]+)([^\s",}]+)', r'\1***REDACTED***'),
+        (r'(authorization[":\s]+)([^\s",}]+)', r'\1***REDACTED***', re.IGNORECASE),
+    ]
+
+    sanitized = text
+    for pattern, replacement, *flags in patterns:
+        flag = flags[0] if flags else 0
+        sanitized = re.sub(pattern, replacement, sanitized, flags=flag)
+
+    return sanitized
 
 
 class ConfigLoader:
@@ -80,6 +112,16 @@ class ConfigLoader:
                 if field not in self.config[section]:
                     raise ValueError(f"Missing required field: {section}.{field}")
 
+        # Validate HTTPS for Graph API URLs
+        base_url = self.config['graph_api'].get('base_url', '')
+        beta_url = self.config['graph_api'].get('beta_url', '')
+
+        if base_url and not base_url.startswith('https://'):
+            raise ValueError(f"graph_api.base_url must use HTTPS: {base_url}")
+
+        if beta_url and not beta_url.startswith('https://'):
+            raise ValueError(f"graph_api.beta_url must use HTTPS: {beta_url}")
+
 
 class AuthManager:
     """Manages OAuth2.0 authentication with Microsoft Graph API."""
@@ -130,8 +172,9 @@ class AuthManager:
             return self.access_token
         else:
             error_msg = result.get("error_description", result.get("error", "Unknown error"))
-            logging.error(f"Authentication failed: {error_msg}")
-            raise RuntimeError(f"Failed to acquire access token: {error_msg}")
+            sanitized_error = sanitize_sensitive_data(str(error_msg))
+            logging.error(f"Authentication failed: {sanitized_error}")
+            raise RuntimeError(f"Failed to acquire access token: {sanitized_error}")
 
 
 class TeamsTranscriptDownloader:
@@ -189,7 +232,9 @@ class TeamsTranscriptDownloader:
 
         except requests.exceptions.HTTPError as e:
             logging.error(f"HTTP error occurred: {e}")
-            logging.error(f"Response: {e.response.text if e.response else 'No response'}")
+            response_text = e.response.text if e.response else 'No response'
+            sanitized_response = sanitize_sensitive_data(response_text)
+            logging.error(f"Response: {sanitized_response}")
             raise
         except requests.exceptions.RequestException as e:
             logging.error(f"Request failed: {e}")
@@ -222,12 +267,13 @@ class TeamsTranscriptDownloader:
             logging.warning(f"Could not retrieve meetings: {e}")
             return []
 
-    def list_transcripts(self, meeting_id: str) -> List[Dict]:
+    def list_transcripts(self, meeting_id: str, user_id: str = 'me') -> List[Dict]:
         """
         List transcripts for a specific meeting.
 
         Args:
             meeting_id: Microsoft Teams meeting ID
+            user_id: User ID or 'me' for current user
 
         Returns:
             List of transcript dictionaries
@@ -235,7 +281,7 @@ class TeamsTranscriptDownloader:
         logging.info(f"Fetching transcripts for meeting: {meeting_id}")
 
         # Using beta endpoint as transcripts API may not be fully available in v1.0
-        url = f"{self.beta_url}/users/me/onlineMeetings/{meeting_id}/transcripts"
+        url = f"{self.beta_url}/users/{user_id}/onlineMeetings/{meeting_id}/transcripts"
 
         try:
             response = self._make_request(url)
@@ -247,7 +293,7 @@ class TeamsTranscriptDownloader:
             logging.warning(f"Could not retrieve transcripts for meeting {meeting_id}: {e}")
             return []
 
-    def download_transcript(self, meeting_id: str, transcript_id: str, output_filename: Optional[str] = None) -> Optional[str]:
+    def download_transcript(self, meeting_id: str, transcript_id: str, output_filename: Optional[str] = None, user_id: str = 'me') -> Optional[str]:
         """
         Download transcript content and save to file.
 
@@ -255,6 +301,7 @@ class TeamsTranscriptDownloader:
             meeting_id: Microsoft Teams meeting ID
             transcript_id: Transcript ID
             output_filename: Optional custom output filename
+            user_id: User ID or 'me' for current user
 
         Returns:
             Path to saved transcript file, or None if download fails
@@ -262,7 +309,7 @@ class TeamsTranscriptDownloader:
         logging.info(f"Downloading transcript: {transcript_id}")
 
         # Get transcript content
-        url = f"{self.beta_url}/users/me/onlineMeetings/{meeting_id}/transcripts/{transcript_id}/content"
+        url = f"{self.beta_url}/users/{user_id}/onlineMeetings/{meeting_id}/transcripts/{transcript_id}/content"
 
         try:
             response = self._make_request(url)
@@ -310,7 +357,7 @@ class TeamsTranscriptDownloader:
             if not meeting_id:
                 continue
 
-            transcripts = self.list_transcripts(meeting_id)
+            transcripts = self.list_transcripts(meeting_id, user_id)
 
             if transcripts:
                 # Get the first (most recent) transcript
@@ -318,7 +365,7 @@ class TeamsTranscriptDownloader:
                 transcript_id = latest_transcript.get('id')
 
                 if transcript_id:
-                    return self.download_transcript(meeting_id, transcript_id)
+                    return self.download_transcript(meeting_id, transcript_id, user_id=user_id)
 
         logging.warning("No transcripts found in any meeting")
         return None

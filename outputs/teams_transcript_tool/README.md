@@ -101,31 +101,64 @@ pip install -r requirements.txt
 
 ### ステップ4: 設定ファイルの作成
 
-プロジェクトルートに `config.json` を作成：
+プロジェクトルートに `config.yaml` を作成（`config.yaml.example` をコピーして編集）：
 
-```json
-{
-  "client_id": "YOUR_CLIENT_ID_HERE",
-  "client_secret": "YOUR_CLIENT_SECRET_HERE",
-  "tenant_id": "YOUR_TENANT_ID_HERE",
-  "authority": "https://login.microsoftonline.com/YOUR_TENANT_ID_HERE",
-  "scope": ["https://graph.microsoft.com/.default"]
-}
+```bash
+cp config.yaml.example config.yaml
+```
+
+**config.yaml の内容**:
+```yaml
+# Azure AD Authentication Settings
+azure:
+  tenant_id: "YOUR_TENANT_ID_HERE"
+  client_id: "YOUR_CLIENT_ID_HERE"
+  client_secret: "YOUR_CLIENT_SECRET_HERE"
+  scopes:
+    - "https://graph.microsoft.com/.default"
+
+# Microsoft Graph API Settings
+graph_api:
+  base_url: "https://graph.microsoft.com/v1.0"
+  beta_url: "https://graph.microsoft.com/beta"
+
+# Output Settings
+output:
+  directory: "./transcripts"
+
+# Logging Settings
+logging:
+  level: "INFO"
+  file: "./teams_transcript_downloader.log"
 ```
 
 **設定項目の説明**:
 
 | 項目 | 説明 | 取得場所 |
 |------|------|----------|
-| `client_id` | アプリケーション（クライアント）ID | Azure AD > アプリの登録 > 概要 |
-| `client_secret` | クライアントシークレット | Azure AD > 証明書とシークレット（作成時にコピーした値） |
-| `tenant_id` | ディレクトリ（テナント）ID | Azure AD > アプリの登録 > 概要 |
-| `authority` | 認証エンドポイント | `https://login.microsoftonline.com/<tenant_id>` |
-| `scope` | API権限スコープ | 固定値: `["https://graph.microsoft.com/.default"]` |
+| `azure.client_id` | アプリケーション（クライアント）ID | Azure AD > アプリの登録 > 概要 |
+| `azure.client_secret` | クライアントシークレット | Azure AD > 証明書とシークレット（作成時にコピーした値） |
+| `azure.tenant_id` | ディレクトリ（テナント）ID | Azure AD > アプリの登録 > 概要 |
+| `azure.scopes` | API権限スコープ | 固定値: `["https://graph.microsoft.com/.default"]` |
+| `graph_api.base_url` | Graph API v1.0 エンドポイント | 固定値: `https://graph.microsoft.com/v1.0` |
+| `graph_api.beta_url` | Graph API Beta エンドポイント | 固定値: `https://graph.microsoft.com/beta` |
+| `output.directory` | トランスクリプト保存先ディレクトリ | 任意のパス（例: `./transcripts`） |
+| `logging.level` | ログレベル | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `logging.file` | ログファイルパス | 任意のパス（例: `./teams_transcript_downloader.log`） |
 
 **⚠️ セキュリティ注意**:
-- `config.json`は機密情報を含むため、必ず`.gitignore`に追加してGit管理から除外してください
+- `config.yaml`は機密情報を含むため、必ず`.gitignore`に追加してGit管理から除外してください
 - クライアントシークレットは定期的に更新することを推奨します
+
+**.gitignoreへの追加例**:
+```
+# Configuration files with sensitive data
+config.yaml
+*.log
+
+# Output directory
+transcripts/
+```
 
 ## 💻 使用方法
 
@@ -139,7 +172,7 @@ python teams_transcript_downloader.py
 
 1. **認証**
    - スクリプトがMicrosoft Graph APIに接続
-   - `config.json`の認証情報を使用して自動ログイン
+   - `config.yaml`の認証情報を使用して自動ログイン
 
 2. **会議一覧の取得**
    - 指定した期間のTeams会議を検索
@@ -176,18 +209,36 @@ python teams_transcript_downloader.py --meeting-id <MEETING_ID>
 [SUCCESS] All transcripts downloaded successfully!
 ```
 
+## ⚠️ 重要: Beta API の使用について
+
+このツールは、Microsoft Graph API の **Beta エンドポイント** を使用しています。
+
+**Beta API の特徴**:
+- トランスクリプト関連の機能は、現時点（2026-02-03）では Beta エンドポイントでのみ提供されています
+- Beta API は予告なく変更される可能性があります
+- プロダクション環境での使用は推奨されません（Microsoftの公式ガイドラインによる）
+
+**推奨事項**:
+- 本番環境で使用する前に、十分なテストを行ってください
+- Microsoft Graph API のアップデート情報を定期的に確認してください
+- 将来的に v1.0 エンドポイントでトランスクリプト機能が利用可能になった場合は、移行を検討してください
+
+**参考リンク**:
+- [Microsoft Graph versioning and support](https://docs.microsoft.com/en-us/graph/versioning-and-support)
+- [Microsoft Graph API changelog](https://docs.microsoft.com/en-us/graph/changelog)
+
 ## 🔧 トラブルシューティング
 
 ### エラー: "Authentication failed"
 
 **原因**:
-- `config.json`の認証情報が間違っている
+- `config.yaml`の認証情報が間違っている
 - クライアントシークレットの有効期限切れ
 
 **対処法**:
-1. `config.json`の`client_id`、`client_secret`、`tenant_id`を確認
-2. Azure Portalで新しいクライアントシークレットを作成し、`config.json`を更新
-3. `tenant_id`が正しいか確認（Azure AD > 概要ページ）
+1. `config.yaml`の`azure.client_id`、`azure.client_secret`、`azure.tenant_id`を確認
+2. Azure Portalで新しいクライアントシークレットを作成し、`config.yaml`を更新
+3. `azure.tenant_id`が正しいか確認（Azure AD > 概要ページ）
 
 ---
 
