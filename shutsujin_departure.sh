@@ -241,7 +241,7 @@ log_info "📜 前回の軍議記録を破棄中..."
 [ -d ./queue/tasks ] || mkdir -p ./queue/tasks
 
 # 足軽タスクファイルリセット
-for i in {1..8}; do
+for i in {1..3}; do
     cat > ./queue/tasks/ashigaru${i}.yaml << EOF
 # 足軽${i}専用タスクファイル
 task:
@@ -255,7 +255,7 @@ EOF
 done
 
 # 足軽レポートファイルリセット
-for i in {1..8}; do
+for i in {1..3}; do
     cat > ./queue/reports/ashigaru${i}_report.yaml << EOF
 worker_id: ashigaru${i}
 task_id: null
@@ -420,30 +420,24 @@ if ! tmux new-session -d -s multiagent -n "agents" 2>/dev/null; then
     exit 1
 fi
 
-# 3x3グリッド作成（合計9ペイン）
-# 最初に3列に分割
-tmux split-window -h -t "multiagent:0"
+# 2x2グリッド作成（合計4ペイン）
+# 最初に2列に分割
 tmux split-window -h -t "multiagent:0"
 
-# 各列を3行に分割
+# 各列を2行に分割
 tmux select-pane -t "multiagent:0.0"
 tmux split-window -v
+
+tmux select-pane -t "multiagent:0.2"
 tmux split-window -v
 
-tmux select-pane -t "multiagent:0.3"
-tmux split-window -v
-tmux split-window -v
 
-tmux select-pane -t "multiagent:0.6"
-tmux split-window -v
-tmux split-window -v
-
-# ペインタイトル設定（0: karo, 1-8: ashigaru1-8）
-PANE_TITLES=("karo" "ashigaru1" "ashigaru2" "ashigaru3" "ashigaru4" "ashigaru5" "ashigaru6" "ashigaru7" "ashigaru8")
+# ペインタイトル設定（0: karo, 1-3: ashigaru1-3）
+PANE_TITLES=("karo" "ashigaru1" "ashigaru2" "ashigaru3")
 # 色設定（karo: 赤, ashigaru: 青）
-PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "blue")
+PANE_COLORS=("red" "blue" "blue" "blue")
 
-for i in {0..8}; do
+for i in {0..3}; do
     tmux select-pane -t "multiagent:0.$i" -T "${PANE_TITLES[$i]}"
     PROMPT_STR=$(generate_prompt "${PANE_TITLES[$i]}" "${PANE_COLORS[$i]}" "$SHELL_SETTING")
     tmux send-keys -t "multiagent:0.$i" "cd \"$(pwd)\" && export PS1='${PROMPT_STR}' && clear" Enter
@@ -500,8 +494,8 @@ if [ "$SETUP_ONLY" = false ]; then
     # 少し待機（安定のため）
     sleep 1
 
-    # 家老 + 足軽（9ペイン）
-    for i in {0..8}; do
+    # 家老 + 足軽（4ペイン）
+    for i in {0..3}; do
         tmux send-keys -t "multiagent:0.$i" "claude --dangerously-skip-permissions"
         tmux send-keys -t "multiagent:0.$i" Enter
     done
@@ -608,7 +602,7 @@ NINJA_EOF
     # 足軽に指示書を読み込ませる（1-8）
     sleep 2
     log_info "  └─ 足軽に指示書を伝達中..."
-    for i in {1..8}; do
+    for i in {1..3}; do
         tmux send-keys -t "multiagent:0.$i" "instructions/ashigaru.md を読んで役割を理解せよ。汝は足軽${i}号である。"
         sleep 0.3
         tmux send-keys -t "multiagent:0.$i" Enter

@@ -1,0 +1,52 @@
+# Microsoft Teams Transcript Downloader - Configuration File
+# Copy this file to config.yaml and fill in your credentials
+
+# Azure AD Authentication Settings
+# Obtain these values from Azure Portal > App registrations
+azure:
+  # Your Azure AD Tenant ID
+  tenant_id: "00000000-0000-0000-0000-000000000000"
+
+  # Your Application (Client) ID
+  client_id: "00000000-0000-0000-0000-000000000000"
+
+  # Your Client Secret (keep this secure!)
+  client_secret: "your-client-secret-here"
+
+  # Required Microsoft Graph API permissions
+  # Make sure these are granted in Azure Portal
+  scopes:
+    - "https://graph.microsoft.com/.default"
+
+# Microsoft Graph API Settings
+graph_api:
+  # Base URL for Microsoft Graph API
+  base_url: "https://graph.microsoft.com/v1.0"
+
+  # Beta endpoint (for features not yet in v1.0)
+  beta_url: "https://graph.microsoft.com/beta"
+
+# Output Settings
+output:
+  # Directory to save downloaded transcripts
+  directory: "./transcripts"
+
+  # File name format for saved transcripts
+  # Available placeholders: {meeting_id}, {timestamp}, {organizer}
+  filename_format: "transcript_{meeting_id}_{timestamp}.vtt"
+
+# Logging Settings
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
+
+  # Log file location (leave empty to log to console only)
+  file: "./teams_transcript_downloader.log"
+
+# Download Settings
+download:
+  # Maximum number of transcripts to list
+  max_results: 50
+
+  # Automatically download the latest transcript on run
+  auto_download_latest: true

@@ -1,0 +1,13 @@
+# Microsoft Teams Transcript Downloader - Dependencies
+
+# Microsoft Authentication Library for OAuth2.0 authentication
+msal>=1.26.0
+
+# HTTP requests library
+requests>=2.31.0
+
+# YAML configuration file parsing
+PyYAML>=6.0.1
+
+# Environment variable management (optional)
+python-dotenv>=1.0.0

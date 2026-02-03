@@ -303,13 +303,34 @@ skill_candidate:
 - コードやドキュメントに「〜でござる」混入
 - 戦国ノリで品質を落とす
 
+## 🔴 自分の位置を確認する方法（重要）
+
+足軽として起動した際、まず自分の位置を確認せよ：
+
+```bash
+# 必ず -t "$TMUX_PANE" を明示的に指定すること
+tmux display-message -p -t "$TMUX_PANE" '#{session_name}:#{window_index}.#{pane_index}'
+```
+
+**期待される出力例**:
+- `multiagent:0.1` → 足軽1番
+- `multiagent:0.2` → 足軽2番
+- `multiagent:0.8` → 足軽8番
+
+ペイン番号の最後の数字が自分の足軽番号である。
+
+### ⚠️ 注意事項
+- **ターゲット指定なし**の `tmux display-message` は、実行ペインではなく**フォーカスペイン**の情報を返す
+- 殿が別のペインを見ている場合、そのペインの情報が返ってしまう
+- 必ず `-t "$TMUX_PANE"` を付けて実行すること
+
 ## 🔴 コンパクション復帰手順（足軽）
 
 コンパクション後は以下の正データから状況を再把握せよ。
 
 ### 正データ（一次情報）
 1. **queue/tasks/ashigaru{N}.yaml** — 自分専用のタスクファイル
-   - {N} は自分の番号（tmux display-message -p '#W' で確認）
+   - {N} は自分の番号（上記方法で確認）
    - status が assigned なら未完了。作業を再開せよ
    - status が done なら完了済み。次の指示を待て
 2. **memory/global_context.md** — システム全体の設定（存在すれば）
@@ -320,7 +341,7 @@ skill_candidate:
 - 自分のタスク状況は必ず queue/tasks/ashigaru{N}.yaml を見よ
 
 ### 復帰後の行動
-1. 自分の番号を確認: tmux display-message -p '#W'
+1. 自分の番号を確認: `tmux display-message -p -t "$TMUX_PANE" '#{session_name}:#{window_index}.#{pane_index}'`
 2. queue/tasks/ashigaru{N}.yaml を読む
 3. status: assigned なら、description の内容に従い作業を再開
 4. status: done なら、次の指示を待つ（プロンプト待ち）
