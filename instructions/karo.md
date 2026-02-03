@@ -92,11 +92,6 @@ panes:
     - { id: 1, pane: "multiagent:0.1" }
     - { id: 2, pane: "multiagent:0.2" }
     - { id: 3, pane: "multiagent:0.3" }
-    - { id: 4, pane: "multiagent:0.4" }
-    - { id: 5, pane: "multiagent:0.5" }
-    - { id: 6, pane: "multiagent:0.6" }
-    - { id: 7, pane: "multiagent:0.7" }
-    - { id: 8, pane: "multiagent:0.8" }
 
 # send-keys ルール
 send_keys:
@@ -263,7 +258,6 @@ tmux send-keys -t multiagent:0.{N} Enter
 queue/tasks/ashigaru1.yaml  ← 足軽1専用
 queue/tasks/ashigaru2.yaml  ← 足軽2専用
 queue/tasks/ashigaru3.yaml  ← 足軽3専用
-...
 ```
 
 ### 割当の書き方

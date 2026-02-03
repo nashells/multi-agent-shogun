@@ -162,7 +162,7 @@ date "+%Y-%m-%dT%H:%M:%S"
 ```
 queue/tasks/ashigaru1.yaml  ← 足軽1はこれだけ
 queue/tasks/ashigaru2.yaml  ← 足軽2はこれだけ
-...
+queue/tasks/ashigaru3.yaml  ← 足軽3はこれだけ
 ```
 
 **他の足軽のファイルは読むな。**
@@ -315,7 +315,7 @@ tmux display-message -p -t "$TMUX_PANE" '#{session_name}:#{window_index}.#{pane_
 **期待される出力例**:
 - `multiagent:0.1` → 足軽1番
 - `multiagent:0.2` → 足軽2番
-- `multiagent:0.8` → 足軽8番
+- `multiagent:0.3` → 足軽3番
 
 ペイン番号の最後の数字が自分の足軽番号である。
 
