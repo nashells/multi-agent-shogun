@@ -256,7 +256,33 @@ if ! command -v claude &> /dev/null; then
     exit 1
 fi
 
-log_war "👑 将軍を召喚中..."
+# tmux の存在確認（Agent Teams の teammateMode: tmux に必要）
+if ! command -v tmux &> /dev/null; then
+    echo ""
+    echo "  ╔════════════════════════════════════════════════════════╗"
+    echo "  ║  [ERROR] tmux not found!                              ║"
+    echo "  ║  Agent Teams の tmux モードには tmux が必要です       ║"
+    echo "  ╚════════════════════════════════════════════════════════╝"
+    echo ""
+    exit 1
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 4: tmux セッション作成 + 将軍起動
+# ═══════════════════════════════════════════════════════════════════════════════
+# Agent Teams (teammateMode: tmux) は tmux 内で Claude を実行する必要がある。
+# 将軍を tmux セッション内で起動し、Agent Teams がチームメイトの pane を自動作成する。
+
+log_war "👑 将軍の本陣を構築中..."
+
+# 既存セッションをクリーンアップ
+tmux kill-session -t shogun 2>/dev/null && log_info "  └─ 既存の shogun セッション撤収" || true
+
+# 将軍用 tmux セッションを作成し、claude-shogun を起動
+tmux new-session -d -s shogun -n "shogun" \
+    "cd '$(pwd)' && ./scripts/claude-shogun --dangerously-skip-permissions"
+
+log_success "  └─ 将軍の本陣、構築完了"
 echo ""
 
 echo ""
@@ -266,21 +292,20 @@ echo "  ╚═══════════════════════
 echo ""
 
 echo "  ┌──────────────────────────────────────────────────────────┐"
-echo "  │  Agent Teams 方式                                        │"
+echo "  │  Agent Teams 方式（tmux モード）                         │"
 echo "  │                                                          │"
-echo "  │  将軍（team_leader）が起動し、チームを自動構成します。   │"
-echo "  │  家老・目付・足軽は Agent Teams が自動で spawn します。  │"
+echo "  │  将軍が tmux セッション 'shogun' で起動しました。        │"
+echo "  │  Agent Teams がチームメイトを tmux pane に自動 spawn。   │"
 echo "  │                                                          │"
-echo "  │  将軍に指示を出してください:                              │"
-echo "  │    「○○プロジェクトの△△を実行せよ」                     │"
+echo "  │  将軍にアタッチして指示を出してください:                  │"
+echo "  │    tmux attach -t shogun                                 │"
 echo "  │                                                          │"
-echo "  │  将軍がチームを構成し、家老に委譲します。                │"
+echo "  │  エージェント一覧:                                        │"
+echo "  │    tmux ls                                               │"
+echo "  │    Ctrl+b → 矢印キー でペイン切替                       │"
 echo "  └──────────────────────────────────────────────────────────┘"
 echo ""
 echo "  ════════════════════════════════════════════════════════════"
 echo "   天下布武！勝利を掴め！ (Tenka Fubu! Seize victory!)"
 echo "  ════════════════════════════════════════════════════════════"
 echo ""
-
-# 将軍を起動
-exec ./scripts/claude-shogun --dangerously-skip-permissions
