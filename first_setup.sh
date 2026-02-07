@@ -40,9 +40,8 @@ log_step() {
     echo -e "\n${CYAN}${BOLD}━━━ $1 ━━━${NC}\n"
 }
 
-# スクリプトのディレクトリを取得
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+# shogun システムのルートディレクトリ
+SHOGUN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 結果追跡用変数
 RESULTS=()
@@ -57,7 +56,7 @@ echo ""
 echo "  このスクリプトは初回セットアップ用です。"
 echo "  依存関係の確認とディレクトリ構造の作成を行います。"
 echo ""
-echo "  インストール先: $SCRIPT_DIR"
+echo "  インストール先: $SHOGUN_ROOT"
 echo ""
 
 # ============================================================
@@ -315,8 +314,8 @@ CREATED_COUNT=0
 EXISTED_COUNT=0
 
 for dir in "${DIRECTORIES[@]}"; do
-    if [ ! -d "$SCRIPT_DIR/$dir" ]; then
-        mkdir -p "$SCRIPT_DIR/$dir"
+    if [ ! -d "$SHOGUN_ROOT/$dir" ]; then
+        mkdir -p "$SHOGUN_ROOT/$dir"
         log_info "作成: $dir/"
         CREATED_COUNT=$((CREATED_COUNT + 1))
     else
@@ -339,9 +338,9 @@ RESULTS+=("ディレクトリ構造: OK (作成:$CREATED_COUNT, 既存:$EXISTED_
 log_step "STEP 6: 設定ファイル確認"
 
 # config/settings.yaml
-if [ ! -f "$SCRIPT_DIR/config/settings.yaml" ]; then
+if [ ! -f "$SHOGUN_ROOT/config/settings.yaml" ]; then
     log_info "config/settings.yaml を作成中..."
-    cat > "$SCRIPT_DIR/config/settings.yaml" << EOF
+    cat > "$SHOGUN_ROOT/config/settings.yaml" << EOF
 # multi-agent-shogun 設定ファイル
 
 # 言語設定
@@ -360,12 +359,12 @@ skill:
   save_path: "~/.claude/skills/"
 
   # ローカルスキル保存先（このプロジェクト専用）
-  local_path: "$SCRIPT_DIR/skills/"
+  local_path: "$SHOGUN_ROOT/skills/"
 
 # ログ設定
 logging:
   level: info  # debug | info | warn | error
-  path: "$SCRIPT_DIR/logs/"
+  path: "$SHOGUN_ROOT/logs/"
 EOF
     log_success "settings.yaml を作成しました"
 else
@@ -373,9 +372,9 @@ else
 fi
 
 # config/projects.yaml
-if [ ! -f "$SCRIPT_DIR/config/projects.yaml" ]; then
+if [ ! -f "$SHOGUN_ROOT/config/projects.yaml" ]; then
     log_info "config/projects.yaml を作成中..."
-    cat > "$SCRIPT_DIR/config/projects.yaml" << 'EOF'
+    cat > "$SHOGUN_ROOT/config/projects.yaml" << 'EOF'
 projects:
   - id: sample_project
     name: "Sample Project"
@@ -399,15 +398,15 @@ log_step "STEP 7: キューファイル初期化"
 
 # 足軽数を設定ファイルから読み込み（デフォルト: 3）
 ASHIGARU_COUNT=3
-if [ -f "$SCRIPT_DIR/config/settings.yaml" ]; then
-    ASHIGARU_COUNT=$(grep "^ashigaru_count:" "$SCRIPT_DIR/config/settings.yaml" 2>/dev/null | awk '{print $2}' || echo "3")
+if [ -f "$SHOGUN_ROOT/config/settings.yaml" ]; then
+    ASHIGARU_COUNT=$(grep "^ashigaru_count:" "$SHOGUN_ROOT/config/settings.yaml" 2>/dev/null | awk '{print $2}' || echo "3")
     ASHIGARU_COUNT=${ASHIGARU_COUNT:-3}
 fi
 log_info "足軽数: $ASHIGARU_COUNT"
 
 # 足軽用タスクファイル作成
 for i in $(seq 1 $ASHIGARU_COUNT); do
-    TASK_FILE="$SCRIPT_DIR/queue/tasks/ashigaru${i}.yaml"
+    TASK_FILE="$SHOGUN_ROOT/queue/tasks/ashigaru${i}.yaml"
     if [ ! -f "$TASK_FILE" ]; then
         cat > "$TASK_FILE" << EOF
 # 足軽${i}専用タスクファイル
@@ -425,7 +424,7 @@ log_info "足軽タスクファイル (1-$ASHIGARU_COUNT) を確認/作成しま
 
 # 足軽用レポートファイル作成
 for i in $(seq 1 $ASHIGARU_COUNT); do
-    REPORT_FILE="$SCRIPT_DIR/queue/reports/ashigaru${i}_report.yaml"
+    REPORT_FILE="$SHOGUN_ROOT/queue/reports/ashigaru${i}_report.yaml"
     if [ ! -f "$REPORT_FILE" ]; then
         cat > "$REPORT_FILE" << EOF
 worker_id: ashigaru${i}
@@ -439,7 +438,7 @@ done
 log_info "足軽レポートファイル (1-$ASHIGARU_COUNT) を確認/作成しました"
 
 # 目付用タスクファイル作成
-METSUKE_TASK_FILE="$SCRIPT_DIR/queue/tasks/metsuke.yaml"
+METSUKE_TASK_FILE="$SHOGUN_ROOT/queue/tasks/metsuke.yaml"
 if [ ! -f "$METSUKE_TASK_FILE" ]; then
     cat > "$METSUKE_TASK_FILE" << EOF
 # 目付専用タスクファイル
@@ -459,7 +458,7 @@ else
 fi
 
 # 目付用レポートファイル作成
-METSUKE_REPORT_FILE="$SCRIPT_DIR/queue/reports/metsuke_report.yaml"
+METSUKE_REPORT_FILE="$SHOGUN_ROOT/queue/reports/metsuke_report.yaml"
 if [ ! -f "$METSUKE_REPORT_FILE" ]; then
     cat > "$METSUKE_REPORT_FILE" << EOF
 # 目付の報告ファイル
@@ -494,8 +493,8 @@ SCRIPTS=(
 )
 
 for script in "${SCRIPTS[@]}"; do
-    if [ -f "$SCRIPT_DIR/$script" ]; then
-        chmod +x "$SCRIPT_DIR/$script"
+    if [ -f "$SHOGUN_ROOT/$script" ]; then
+        chmod +x "$SHOGUN_ROOT/$script"
         log_info "$script に実行権限を付与しました"
     fi
 done
@@ -515,7 +514,7 @@ ALIAS_ADDED=false
 
 # css alias (出陣コマンド)
 if [ -f "$BASHRC_FILE" ]; then
-    EXPECTED_CSS="alias css='cd \"$SCRIPT_DIR\" && ./shutsujin_departure.sh'"
+    EXPECTED_CSS="alias css='cd \"$SHOGUN_ROOT\" && ./shutsujin_departure.sh'"
     if ! grep -q "alias css=" "$BASHRC_FILE" 2>/dev/null; then
         # alias が存在しない → 新規追加
         echo "" >> "$BASHRC_FILE"
@@ -536,7 +535,7 @@ if [ -f "$BASHRC_FILE" ]; then
     fi
 
     # csm alias (ディレクトリ移動)
-    EXPECTED_CSM="alias csm='cd \"$SCRIPT_DIR\"'"
+    EXPECTED_CSM="alias csm='cd \"$SHOGUN_ROOT\"'"
     if ! grep -q "alias csm=" "$BASHRC_FILE" 2>/dev/null; then
         if [ "$ALIAS_ADDED" = false ]; then
             echo "" >> "$BASHRC_FILE"
@@ -579,7 +578,7 @@ if command -v claude &> /dev/null; then
     else
         log_info "Memory MCP を設定中..."
         if claude mcp add memory \
-            -e MEMORY_FILE_PATH="$SCRIPT_DIR/memory/shogun_memory.jsonl" \
+            -e MEMORY_FILE_PATH="$SHOGUN_ROOT/memory/shogun_memory.jsonl" \
             -- npx -y @modelcontextprotocol/server-memory 2>/dev/null; then
             log_success "Memory MCP 設定完了"
             RESULTS+=("Memory MCP: 設定完了")

@@ -8,5 +8,5 @@
 # 推奨: 直接 ./shutsujin_departure.sh を使用してください。
 # ═══════════════════════════════════════════════════════════════════════════════
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "$SCRIPT_DIR/shutsujin_departure.sh" "$@"
+SHOGUN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SHOGUN_ROOT/shutsujin_departure.sh" "$@"

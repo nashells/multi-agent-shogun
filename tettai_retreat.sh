@@ -10,9 +10,8 @@
 
 set -e
 
-# スクリプトのディレクトリを取得
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+# shogun システムのルートディレクトリ
+SHOGUN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Agent Teams データのパス
 TEAM_DIR="$HOME/.claude/teams/shogun-team"
@@ -129,12 +128,12 @@ echo ""
 # バックアップ（強制モードでなければ）
 # ═══════════════════════════════════════════════════════════════════════════════
 if [ "$FORCE_MODE" = false ]; then
-    BACKUP_DIR="./logs/backup_$(date '+%Y%m%d_%H%M%S')"
+    BACKUP_DIR="${SHOGUN_ROOT}/logs/backup_$(date '+%Y%m%d_%H%M%S')"
     NEED_BACKUP=false
 
     # dashboard.md のバックアップ判定
-    if [ -f "./dashboard.md" ]; then
-        if grep -q "cmd_" "./dashboard.md" 2>/dev/null; then
+    if [ -f "${SHOGUN_ROOT}/dashboard.md" ]; then
+        if grep -q "cmd_" "${SHOGUN_ROOT}/dashboard.md" 2>/dev/null; then
             NEED_BACKUP=true
         fi
     fi
@@ -149,8 +148,8 @@ if [ "$FORCE_MODE" = false ]; then
         mkdir -p "$BACKUP_DIR" || true
 
         # dashboard.md のバックアップ
-        if [ -f "./dashboard.md" ]; then
-            cp "./dashboard.md" "$BACKUP_DIR/" 2>/dev/null || true
+        if [ -f "${SHOGUN_ROOT}/dashboard.md" ]; then
+            cp "${SHOGUN_ROOT}/dashboard.md" "$BACKUP_DIR/" 2>/dev/null || true
             log_success "  ├─ dashboard.md バックアップ完了"
         fi
 
@@ -169,7 +168,7 @@ fi
 # 未完了タスク保存（-f モードでも実行）
 # ═══════════════════════════════════════════════════════════════════════════════
 if [ -d "$TASK_DIR" ]; then
-    PENDING_YAML="./status/pending_tasks.yaml"
+    PENDING_YAML="${SHOGUN_ROOT}/status/pending_tasks.yaml"
     PENDING_COUNT=0
     PENDING_ENTRIES=""
 
@@ -204,7 +203,7 @@ $(echo "$task_description" | sed 's/^/      /')
     done
 
     if [ "$PENDING_COUNT" -gt 0 ]; then
-        mkdir -p ./status
+        mkdir -p "${SHOGUN_ROOT}/status"
         SAVED_AT=$(date "+%Y-%m-%d %H:%M")
         {
             echo "# 未完了タスク一覧（撤退時自動保存）"

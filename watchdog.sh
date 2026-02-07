@@ -7,13 +7,13 @@
 #   - dashboard.md更新検知 → 将軍に通知
 #   - 家老のアイドル検知（未処理報告がある場合）
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LOG_FILE="$SCRIPT_DIR/logs/watchdog.log"
+SHOGUN_ROOT="$(cd "$(dirname "$0")" && pwd)"
+LOG_FILE="$SHOGUN_ROOT/logs/watchdog.log"
 CHECK_INTERVAL=300  # 5分ごとにチェック
-LIMIT_RESET_FILE="$SCRIPT_DIR/.limit_reset_times"
+LIMIT_RESET_FILE="$SHOGUN_ROOT/.limit_reset_times"
 
 # ログディレクトリ作成
-mkdir -p "$SCRIPT_DIR/logs"
+mkdir -p "$SHOGUN_ROOT/logs"
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
@@ -22,7 +22,7 @@ log() {
 notify() {
   local pane=$1
   local message=$2
-  "$SCRIPT_DIR/scripts/notify.sh" "$pane" "$message"
+  "$SHOGUN_ROOT/scripts/notify.sh" "$pane" "$message"
 }
 
 # 12時間形式の時刻をUNIXタイムスタンプに変換（今日の日付で）
@@ -152,7 +152,7 @@ check_idle() {
   if echo "$output" | grep -qE "^❯ *$"; then
     # 家老の場合、未処理報告があるか確認
     if [ "$name" = "karo" ]; then
-      local report_count=$(find "$SCRIPT_DIR/queue/reports" -name "*.yaml" -mmin -10 -type f 2>/dev/null | wc -l | tr -d ' ')
+      local report_count=$(find "$SHOGUN_ROOT/queue/reports" -name "*.yaml" -mmin -10 -type f 2>/dev/null | wc -l | tr -d ' ')
 
       if [ "$report_count" -gt 0 ]; then
         log "⚠️  [karo] アイドル状態 + 未処理報告あり ($report_count件) - 起床"
@@ -167,8 +167,8 @@ check_idle() {
 
 # 4. dashboard.md更新検知 → 将軍に報告
 check_dashboard_update() {
-  local dashboard="$SCRIPT_DIR/dashboard.md"
-  local last_check_file="$SCRIPT_DIR/.last_dashboard_check"
+  local dashboard="$SHOGUN_ROOT/dashboard.md"
+  local last_check_file="$SHOGUN_ROOT/.last_dashboard_check"
 
   # 初回実行時
   if [ ! -f "$last_check_file" ]; then

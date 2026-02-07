@@ -12,20 +12,19 @@ set -e
 # 実行時のカレントディレクトリを作業ディレクトリとして保存
 WORK_DIR="$(pwd)"
 
-# スクリプトのディレクトリを取得
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+# shogun システムのルートディレクトリ（このスクリプトの場所）
+SHOGUN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 言語設定を読み取り（デフォルト: ja）
 LANG_SETTING="ja"
-if [ -f "./config/settings.yaml" ]; then
-    LANG_SETTING=$(grep "^language:" ./config/settings.yaml 2>/dev/null | awk '{print $2}' || echo "ja")
+if [ -f "${SHOGUN_ROOT}/config/settings.yaml" ]; then
+    LANG_SETTING=$(grep "^language:" "${SHOGUN_ROOT}/config/settings.yaml" 2>/dev/null | awk '{print $2}' || echo "ja")
 fi
 
 # 足軽数を読み取り（デフォルト: 3）
 ASHIGARU_COUNT=3
-if [ -f "./config/settings.yaml" ]; then
-    ASHIGARU_COUNT=$(grep "^ashigaru_count:" ./config/settings.yaml 2>/dev/null | awk '{print $2}' || echo "3")
+if [ -f "${SHOGUN_ROOT}/config/settings.yaml" ]; then
+    ASHIGARU_COUNT=$(grep "^ashigaru_count:" "${SHOGUN_ROOT}/config/settings.yaml" 2>/dev/null | awk '{print $2}' || echo "3")
     ASHIGARU_COUNT=${ASHIGARU_COUNT:-3}
 fi
 
@@ -171,18 +170,18 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 1: 前回記録のバックアップ（内容がある場合のみ）
 # ═══════════════════════════════════════════════════════════════════════════════
-BACKUP_DIR="./logs/backup_$(date '+%Y%m%d_%H%M%S')"
+BACKUP_DIR="${SHOGUN_ROOT}/logs/backup_$(date '+%Y%m%d_%H%M%S')"
 NEED_BACKUP=false
 
-if [ -f "./dashboard.md" ]; then
-    if grep -q "cmd_" "./dashboard.md" 2>/dev/null; then
+if [ -f "${SHOGUN_ROOT}/dashboard.md" ]; then
+    if grep -q "cmd_" "${SHOGUN_ROOT}/dashboard.md" 2>/dev/null; then
         NEED_BACKUP=true
     fi
 fi
 
 if [ "$NEED_BACKUP" = true ]; then
     mkdir -p "$BACKUP_DIR" || true
-    cp "./dashboard.md" "$BACKUP_DIR/" 2>/dev/null || true
+    cp "${SHOGUN_ROOT}/dashboard.md" "$BACKUP_DIR/" 2>/dev/null || true
     log_info "📦 前回の記録をバックアップ: $BACKUP_DIR"
 fi
 
@@ -193,7 +192,7 @@ log_info "📊 戦況報告板を初期化中..."
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M")
 
 if [ "$LANG_SETTING" = "ja" ]; then
-    cat > ./dashboard.md << EOF
+    cat > "${SHOGUN_ROOT}/dashboard.md" << EOF
 # 📊 戦況報告
 最終更新: ${TIMESTAMP}
 
@@ -220,7 +219,7 @@ if [ "$LANG_SETTING" = "ja" ]; then
 なし
 EOF
 else
-    cat > ./dashboard.md << EOF
+    cat > "${SHOGUN_ROOT}/dashboard.md" << EOF
 # 📊 戦況報告 (Battle Status Report)
 最終更新 (Last Updated): ${TIMESTAMP}
 
@@ -292,15 +291,17 @@ tmux kill-session -t multiagent 2>/dev/null && log_info "  └─ 既存の mult
 
 # 将軍用 tmux セッション（Claude Code を起動）
 tmux new-session -d -s shogun -n "shogun" \
-    "cd '${WORK_DIR}' && '${SCRIPT_DIR}/scripts/claude-shogun' --dangerously-skip-permissions"
+    "cd '${WORK_DIR}' && '${SHOGUN_ROOT}/scripts/claude-shogun' --dangerously-skip-permissions"
 
 # チームメイト用 tmux セッション（配下の陣）
 tmux new-session -d -s multiagent -n "agents"
+INITIAL_PANE=$(tmux display-message -t multiagent:agents -p '#{pane_id}')
 
 # tmux フック: shogun で pane が split されたら multiagent に自動移動
 # Agent Teams が teammateMode: tmux で pane を作るたび発火する
+# 初回移動時に空の初期 pane を削除する（2回目以降は既に消えているので無視）
 tmux set-hook -t shogun after-split-window \
-    "move-pane -t multiagent:agents ; select-layout -t multiagent:agents tiled"
+    "move-pane -t multiagent:agents ; select-layout -t multiagent:agents tiled ; run-shell -b 'tmux kill-pane -t ${INITIAL_PANE} 2>/dev/null || true'"
 
 log_success "  └─ 将軍の本陣（shogun）構築完了"
 log_success "  └─ 配下の陣（multiagent）構築完了"
@@ -332,15 +333,18 @@ if [ "$READY" = true ]; then
     ASHIGARU_SPAWN=""
     for i in $(seq 1 "$ASHIGARU_COUNT"); do
         ASHIGARU_SPAWN="${ASHIGARU_SPAWN}
-- 足軽${i}号（ashigaru${i}）: instructions/ashigaru.md を読ませよ"
+- 足軽${i}号（ashigaru${i}）: ${SHOGUN_ROOT}/instructions/ashigaru.md を読ませよ"
     done
 
     # チーム構成の初期プロンプトを送信
-    INIT_PROMPT="instructions/shogun.md を読んで将軍として起動せよ。CLAUDE.md も読め。config/settings.yaml で言語設定を確認せよ。
+    # claude-shogun が SHOGUN_ROOT 環境変数を export 済み
+    INIT_PROMPT="${SHOGUN_ROOT}/instructions/shogun.md を読んで将軍として起動せよ。${SHOGUN_ROOT}/CLAUDE.md も読め。${SHOGUN_ROOT}/config/settings.yaml で言語設定を確認せよ。
+
+環境変数 SHOGUN_ROOT=${SHOGUN_ROOT} が設定済みである。shogun システムのファイルは全て \$SHOGUN_ROOT 配下にある。
 
 TeamCreate でチーム shogun-team を作成し、以下のチームメイトを Task で spawn せよ:
-- 家老（karo）: instructions/karo.md を読ませよ。mode は delegate にせよ。
-- 目付（metsuke）: instructions/metsuke.md を読ませよ。${ASHIGARU_SPAWN}
+- 家老（karo）: ${SHOGUN_ROOT}/instructions/karo.md を読ませよ。mode は delegate にせよ。
+- 目付（metsuke）: ${SHOGUN_ROOT}/instructions/metsuke.md を読ませよ。${ASHIGARU_SPAWN}
 
 全員が起動したら、殿の指示を待て。"
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 # switch_account.sh - Claudeアカウント切り替えスクリプト
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SHOGUN_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=========================================="
 echo "  Claude アカウント切り替え"
@@ -15,9 +15,9 @@ tmux has-session -t multiagent 2>/dev/null && echo "  - multiagent: 稼働中" |
 echo ""
 
 # 2. dashboard.md 最終更新確認
-if [ -f "$SCRIPT_DIR/dashboard.md" ]; then
+if [ -f "$SHOGUN_ROOT/dashboard.md" ]; then
   echo "📋 dashboard.md 最終更新:"
-  head -2 "$SCRIPT_DIR/dashboard.md" | tail -1
+  head -2 "$SHOGUN_ROOT/dashboard.md" | tail -1
   echo ""
 fi
 
@@ -79,7 +79,7 @@ if [ "$restart_answer" = "y" ]; then
   echo "起動中..."
 
   # shogun起動
-  cd "$SCRIPT_DIR" || exit 1
+  cd "$SHOGUN_ROOT" || exit 1
   ./shogun.sh &
   SHOGUN_PID=$!
   sleep 2
