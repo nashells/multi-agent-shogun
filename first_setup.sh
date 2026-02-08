@@ -154,6 +154,38 @@ else
 fi
 
 # ============================================================
+# STEP 2.5: tmux マウススクロール設定
+# ============================================================
+log_step "STEP 2.5: tmux マウススクロール設定"
+
+TMUX_CONF="$HOME/.tmux.conf"
+TMUX_MOUSE_SETTING="set -g mouse on"
+
+if [ -f "$TMUX_CONF" ] && grep -qF "$TMUX_MOUSE_SETTING" "$TMUX_CONF" 2>/dev/null; then
+    log_info "tmux マウス設定は既に ~/.tmux.conf に存在します"
+else
+    log_info "~/.tmux.conf に '$TMUX_MOUSE_SETTING' を追加中..."
+    echo "" >> "$TMUX_CONF"
+    echo "# マウススクロール有効化 (added by first_setup.sh)" >> "$TMUX_CONF"
+    echo "$TMUX_MOUSE_SETTING" >> "$TMUX_CONF"
+    log_success "tmux マウス設定を追加しました"
+fi
+
+# tmux が起動中の場合は即反映
+if command -v tmux &> /dev/null && tmux list-sessions &> /dev/null; then
+    log_info "tmux が起動中のため、設定を即反映します..."
+    if tmux source-file "$TMUX_CONF" 2>/dev/null; then
+        log_success "tmux 設定を再読み込みしました"
+    else
+        log_warn "tmux 設定の再読み込みに失敗しました（手動で tmux source-file ~/.tmux.conf を実行してください）"
+    fi
+else
+    log_info "tmux は起動していないため、次回起動時に反映されます"
+fi
+
+RESULTS+=("tmux マウス設定: OK")
+
+# ============================================================
 # STEP 3: Node.js チェック
 # ============================================================
 log_step "STEP 3: Node.js チェック"
@@ -244,50 +276,131 @@ else
 fi
 
 # ============================================================
-# STEP 4: Claude Code CLI チェック
+# STEP 4: Claude Code CLI チェック（ネイティブ版）
+# ※ npm版は公式非推奨（deprecated）。ネイティブ版を使用する。
+#    Node.jsはMCPサーバー（npx経由）で引き続き必要。
 # ============================================================
 log_step "STEP 4: Claude Code CLI チェック"
 
+# ネイティブ版の既存インストールを検出するため、PATHに ~/.local/bin を含める
+export PATH="$HOME/.local/bin:$PATH"
+
+NEED_CLAUDE_INSTALL=false
+HAS_NPM_CLAUDE=false
+
 if command -v claude &> /dev/null; then
-    # バージョン取得を試みる
-    CLAUDE_VERSION=$(claude --version 2>/dev/null || echo "unknown")
-    log_success "Claude Code CLI がインストール済みです"
-    log_info "バージョン: $CLAUDE_VERSION"
-    RESULTS+=("Claude Code CLI: OK")
-else
-    log_warn "Claude Code CLI がインストールされていません"
-    echo ""
+    # claude コマンドは存在する → 実際に動くかチェック
+    CLAUDE_VERSION=$(claude --version 2>&1)
+    CLAUDE_PATH=$(which claude 2>/dev/null)
 
-    if command -v npm &> /dev/null; then
-        echo "  インストールコマンド:"
-        echo "     npm install -g @anthropic-ai/claude-code"
-        echo ""
-        if [ ! -t 0 ]; then
-            REPLY="Y"
-        else
-            read -p "  今すぐインストールしますか? [Y/n]: " REPLY
-        fi
-        REPLY=${REPLY:-Y}
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            log_info "Claude Code CLI をインストール中..."
-            npm install -g @anthropic-ai/claude-code
-
-            if command -v claude &> /dev/null; then
-                log_success "Claude Code CLI インストール完了"
-                RESULTS+=("Claude Code CLI: インストール完了")
+    if [ $? -eq 0 ] && [ "$CLAUDE_VERSION" != "unknown" ] && [[ "$CLAUDE_VERSION" != *"not found"* ]]; then
+        # 動作する claude が見つかった → npm版かネイティブ版かを判定
+        if echo "$CLAUDE_PATH" | grep -qi "npm\|node_modules\|AppData"; then
+            # npm版が動いている
+            HAS_NPM_CLAUDE=true
+            log_warn "npm版 Claude Code CLI が検出されました（公式非推奨）"
+            log_info "検出パス: $CLAUDE_PATH"
+            log_info "バージョン: $CLAUDE_VERSION"
+            echo ""
+            echo "  npm版は公式で非推奨（deprecated）となっています。"
+            echo "  ネイティブ版をインストールし、npm版はアンインストールすることを推奨します。"
+            echo ""
+            if [ ! -t 0 ]; then
+                REPLY="Y"
             else
-                log_error "インストールに失敗しました。パスを確認してください"
-                RESULTS+=("Claude Code CLI: インストール失敗")
-                HAS_ERROR=true
+                read -p "  ネイティブ版をインストールしますか? [Y/n]: " REPLY
+            fi
+            REPLY=${REPLY:-Y}
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                NEED_CLAUDE_INSTALL=true
+                # npm版のアンインストール案内
+                echo ""
+                log_info "先にnpm版をアンインストールしてください:"
+                if echo "$CLAUDE_PATH" | grep -qi "mnt/c\|AppData"; then
+                    echo "  Windows の PowerShell で:"
+                    echo "    npm uninstall -g @anthropic-ai/claude-code"
+                else
+                    echo "    npm uninstall -g @anthropic-ai/claude-code"
+                fi
+                echo ""
+            else
+                log_warn "ネイティブ版への移行をスキップしました（npm版で続行）"
+                RESULTS+=("Claude Code CLI: OK (npm版・移行推奨)")
             fi
         else
-            log_warn "インストールをスキップしました"
-            RESULTS+=("Claude Code CLI: 未インストール (スキップ)")
+            # ネイティブ版が正常に動作している
+            log_success "Claude Code CLI がインストール済みです（ネイティブ版）"
+            log_info "バージョン: $CLAUDE_VERSION"
+            RESULTS+=("Claude Code CLI: OK")
+        fi
+    else
+        # command -v で見つかるが動かない（npm版でNode.js無し等）
+        log_warn "Claude Code CLI が見つかりましたが正常に動作しません"
+        log_info "検出パス: $CLAUDE_PATH"
+        if echo "$CLAUDE_PATH" | grep -qi "npm\|node_modules\|AppData"; then
+            HAS_NPM_CLAUDE=true
+            log_info "→ npm版（Node.js依存）が検出されました"
+        else
+            log_info "→ バージョン取得に失敗しました"
+        fi
+        NEED_CLAUDE_INSTALL=true
+    fi
+else
+    # claude コマンドが見つからない
+    NEED_CLAUDE_INSTALL=true
+fi
+
+if [ "$NEED_CLAUDE_INSTALL" = true ]; then
+    log_info "ネイティブ版 Claude Code CLI をインストールします"
+    echo ""
+    if [ ! -t 0 ]; then
+        REPLY="Y"
+    else
+        read -p "  今すぐインストールしますか? [Y/n]: " REPLY
+    fi
+    REPLY=${REPLY:-Y}
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Claude Code CLI をインストール中（ネイティブ版）..."
+        curl -fsSL https://claude.ai/install.sh | bash
+
+        # PATHを更新（インストール直後は反映されていない可能性）
+        export PATH="$HOME/.local/bin:$PATH"
+
+        # .bashrc に永続化（重複追加を防止）
+        if ! grep -q 'export PATH="\$HOME/.local/bin:\$PATH"' "$HOME/.bashrc" 2>/dev/null; then
+            echo '' >> "$HOME/.bashrc"
+            echo '# Claude Code CLI PATH (added by first_setup.sh)' >> "$HOME/.bashrc"
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+            log_info "~/.local/bin を ~/.bashrc の PATH に追加しました"
+        fi
+
+        if command -v claude &> /dev/null; then
+            CLAUDE_VERSION=$(claude --version 2>/dev/null || echo "unknown")
+            log_success "Claude Code CLI インストール完了（ネイティブ版）"
+            log_info "バージョン: $CLAUDE_VERSION"
+            RESULTS+=("Claude Code CLI: インストール完了")
+
+            # npm版が残っている場合の案内
+            if [ "$HAS_NPM_CLAUDE" = true ]; then
+                echo ""
+                log_info "ネイティブ版がPATHで優先されるため、npm版は無効化されます"
+                log_info "npm版を完全に削除するには以下を実行してください:"
+                if echo "$CLAUDE_PATH" | grep -qi "mnt/c\|AppData"; then
+                    echo "  Windows の PowerShell で:"
+                    echo "    npm uninstall -g @anthropic-ai/claude-code"
+                else
+                    echo "    npm uninstall -g @anthropic-ai/claude-code"
+                fi
+            fi
+        else
+            log_error "インストールに失敗しました。パスを確認してください"
+            log_info "~/.local/bin がPATHに含まれているか確認してください"
+            RESULTS+=("Claude Code CLI: インストール失敗")
             HAS_ERROR=true
         fi
     else
-        echo "  npm がインストールされていないため、先に Node.js をインストールしてください"
-        RESULTS+=("Claude Code CLI: 未インストール (npm必要)")
+        log_warn "インストールをスキップしました"
+        RESULTS+=("Claude Code CLI: 未インストール (スキップ)")
         HAS_ERROR=true
     fi
 fi
@@ -349,6 +462,11 @@ language: ja
 # tmuxペイン数やタスクファイル数に影響
 ashigaru_count: 3
 
+# シェル設定
+# bash: bash用プロンプト（デフォルト）
+# zsh: zsh用プロンプト
+shell: bash
+
 # スキル設定
 skill:
   # スキル保存先（スキル名に shogun- プレフィックスを付けて保存）
@@ -383,6 +501,27 @@ EOF
     log_success "projects.yaml を作成しました"
 else
     log_info "config/projects.yaml は既に存在します"
+fi
+
+# memory/global_context.md（システム全体のコンテキスト）
+if [ ! -f "$SHOGUN_ROOT/memory/global_context.md" ]; then
+    log_info "memory/global_context.md を作成中..."
+    cat > "$SHOGUN_ROOT/memory/global_context.md" << 'EOF'
+# グローバルコンテキスト
+最終更新: (未設定)
+
+## システム方針
+- (殿の好み・方針をここに記載)
+
+## プロジェクト横断の決定事項
+- (複数プロジェクトに影響する決定をここに記載)
+
+## 注意事項
+- (全エージェントが知るべき注意点をここに記載)
+EOF
+    log_success "global_context.md を作成しました"
+else
+    log_info "memory/global_context.md は既に存在します"
 fi
 
 RESULTS+=("設定ファイル: OK")
@@ -550,8 +689,12 @@ echo "  出陣（全エージェント起動）:"
 echo "     ./shutsujin_departure.sh"
 echo ""
 echo "  オプション:"
-echo "     ./shutsujin_departure.sh -s   # セットアップのみ（Claude手動起動）"
-echo "     ./shutsujin_departure.sh -t   # Windows Terminalタブ展開"
+echo "     ./shutsujin_departure.sh -s            # セットアップのみ（Claude手動起動）"
+echo "     ./shutsujin_departure.sh -t            # Windows Terminalタブ展開"
+echo "     ./shutsujin_departure.sh -shell bash   # bash用プロンプトで起動"
+echo "     ./shutsujin_departure.sh -shell zsh    # zsh用プロンプトで起動"
+echo ""
+echo "  ※ シェル設定は config/settings.yaml の shell: でも変更可能です"
 echo ""
 echo "  詳細は README.md を参照してください。"
 echo ""

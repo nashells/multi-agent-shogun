@@ -3,6 +3,41 @@
 [yohey-w/multi-agent-shogun](https://github.com/yohey-w/multi-agent-shogun) の `9e23e2c` からfork。
 以降の変更履歴を記す。
 
+## upstream マージ履歴
+
+### 2026-02-08: upstream/main (95356d2) マージ
+
+fork 元が 64 コミット先行していたため、汎用的改善を選択的に取り込み。
+通信基盤が根本的に異なる（upstream: YAML+mailbox vs ours: Agent Teams）ため、全面マージではなく cherry-pick 方式。
+
+#### 取り込んだ改善
+| ファイル | 取り込み内容 |
+|---------|-------------|
+| `first_setup.sh` | tmux マウススクロール設定、CLI ネイティブ版対応、`memory/global_context.md` テンプレート、shell オプション |
+| `shutsujin_departure.sh` | `pane-base-index 0` 明示設定 |
+| `instructions/karo.md` | RACE-001 詳細化、idle 最小化ルール、Bloom 分類、FG ブロック禁止 |
+| `instructions/ashigaru.md` | 目的検証、自己識別ルール |
+| `docs/philosophy.md` | 新規取り込み（Agent Teams 版に書き換え） |
+| `templates/integ_*.md` | 統合テンプレート 5 ファイル取り込み |
+| `.claude/settings.json` | spinnerVerbs（戦国風ジョーク）取り込み |
+| `LICENSE` | MIT ライセンス更新 |
+
+#### 不要として除外
+| ファイル | 理由 |
+|---------|------|
+| `scripts/inbox_*.sh` | Agent Teams で不要（mailbox 通信基盤） |
+| `scripts/ntfy*.sh` | Agent Teams で不要（ntfy 通知基盤） |
+| `saytask/streaks.yaml.sample` | Agent Teams で不要（SayTask 機能） |
+| `images/screenshots/*` | ntfy スクリーンショット（不要） |
+
+#### ours を維持
+| ファイル | 理由 |
+|---------|------|
+| `CLAUDE.md` | Agent Teams 版の通信プロトコル |
+| `README.md` / `README_ja.md` | Agent Teams 版の説明 |
+| `instructions/shogun.md` | Agent Teams 版のワークフロー |
+| `.gitignore` | blacklist 方式（upstream は whitelist 方式） |
+
 ## 2026-02-08
 
 - **プロジェクト単位の独立運用**: 複数プロジェクトを並行管理できるよう全スクリプトを改修

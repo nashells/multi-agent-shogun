@@ -356,9 +356,11 @@ tmux kill-session -t "${TMUX_MULTIAGENT}" 2>/dev/null && log_info "  └─ 既�
 # 将軍用 tmux セッション（Claude Code を起動）
 tmux new-session -d -s "${TMUX_SHOGUN}" -n "shogun" \
     "cd '${WORK_DIR}' && WORK_DIR='${WORK_DIR}' SHOGUN_DATA_DIR='${SHOGUN_DATA_DIR}' '${SHOGUN_ROOT}/scripts/claude-shogun' --dangerously-skip-permissions"
+tmux set-option -t "${TMUX_SHOGUN}" pane-base-index 0
 
 # チームメイト用 tmux セッション（配下の陣）
 tmux new-session -d -s "${TMUX_MULTIAGENT}" -n "agents"
+tmux set-option -t "${TMUX_MULTIAGENT}" pane-base-index 0
 INITIAL_PANE=$(tmux display-message -t "${TMUX_MULTIAGENT}:agents" -p '#{pane_id}')
 
 # tmux フック: shogun で pane が split されたら multiagent に自動移動
