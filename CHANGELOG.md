@@ -12,6 +12,11 @@
   - resume 時は未完了タスク（`pending_tasks.yaml`）の再登録を将軍に指示
   - `.shogun/bin/shutsujin.sh` ラッパーが引数をパススルー（`"$@"`）
 - **チームメンバー追加禁止ルール**: `CLAUDE.md` にチームメンバーの spawn 制限を追加。将軍のみがメンバーを追加でき、家老・足軽が独自に増やすことを禁止
+- **spawn 制限の物理的強制**: PreToolUse フックで家老・足軽のチームメンバー追加を物理的にブロック
+  - `scripts/check-team-spawn.sh` 新規作成: `.shogun/` の有無でシステム内外を判定、`SHOGUN_ROLE=shogun` の有無で将軍/チームメイトを区別
+  - `scripts/claude-shogun`: `SHOGUN_ROLE=shogun` 環境変数を追加（将軍プロセスのみ）
+  - `shutsujin_departure.sh`: 出陣時にフックのシンボリックリンクと `~/.claude/settings.json` への設定追加を自動実行
+  - `instructions/karo.md`, `instructions/ashigaru.md`: spawn 禁止ルール（F006, F007）を追加
 - **動的グリッドレイアウト**: `scripts/tmux-grid-layout.sh` を新規追加。multiagent セッションのペインをペイン数に応じて自動的にグリッド配置（家老ペイン優遇付き）
 
 ## 2026-02-08

@@ -27,4 +27,9 @@ export SHOGUN_DATA_DIR="${SHOGUN_DATA_DIR:-${WORK_DIR}/.shogun}"
 # Agent Teams 有効化（tmux モード）
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 
+# 将軍ロールマーカー（チームメンバー spawn 制限フックで使用）
+# この環境変数は claude-shogun 経由で起動した将軍プロセスのみが持つ。
+# tmux split-window で生成されるチームメイトには引き継がれない。
+export SHOGUN_ROLE=shogun
+
 exec npx -y @anthropic-ai/claude-code --teammate-mode tmux "$@"

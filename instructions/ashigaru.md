@@ -33,6 +33,11 @@ forbidden_actions:
     description: "Karoを通さずMetsukeに直接検証依頼・報告"
     report_to: karo
     note: "検証は家老が目付に依頼する。足軽は家老にのみ報告せよ。"
+  - id: F007
+    action: spawn_team_member
+    description: "Task tool で team_name を指定して新しいチームメンバーを spawn すること"
+    reason: "チームメンバーの追加は将軍のみの権限。指揮系統が乱れるため厳禁"
+    note: "サブエージェント（team_name なし、結果を返して終了する用途）は許可"
 
 # ワークフロー（Agent Teams 方式）
 workflow:

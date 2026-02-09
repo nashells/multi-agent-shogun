@@ -259,6 +259,68 @@ log_success "  └─ bin/ ラッパースクリプト生成完了"
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# STEP 3b: spawn 制限フック設定（~/.claude/ 配下）
+# ═══════════════════════════════════════════════════════════════════════════════
+# 家老・足軽がチームメンバーを追加するのを物理的に防ぐフック。
+# - シンボリックリンク: ~/.claude/hooks/check-team-spawn.sh → SHOGUN_ROOT/scripts/
+# - フック設定: ~/.claude/settings.json の hooks.PreToolUse に追加
+log_info "🔒 spawn 制限フックを確認中..."
+
+HOOK_SCRIPT="${SHOGUN_ROOT}/scripts/check-team-spawn.sh"
+HOOK_LINK="$HOME/.claude/hooks/check-team-spawn.sh"
+
+# シンボリックリンクの作成/更新
+mkdir -p "$HOME/.claude/hooks"
+if [ ! -L "$HOOK_LINK" ] || [ "$(readlink "$HOOK_LINK")" != "$HOOK_SCRIPT" ]; then
+    ln -sf "$HOOK_SCRIPT" "$HOOK_LINK"
+    log_success "  └─ シンボリックリンク更新: ~/.claude/hooks/check-team-spawn.sh"
+else
+    log_info "  └─ シンボリックリンク確認済み"
+fi
+
+# ~/.claude/settings.json にフック設定を追加（jq が必要）
+SETTINGS_FILE="$HOME/.claude/settings.json"
+if command -v jq &> /dev/null; then
+    if [ -f "$SETTINGS_FILE" ]; then
+        # check-team-spawn フックが既に設定されているか確認
+        if ! jq -e '.hooks.PreToolUse[]? | select(.hooks[]?.command | test("check-team-spawn"))' "$SETTINGS_FILE" > /dev/null 2>&1; then
+            HOOK_ENTRY='{"matcher":"Task|TeamCreate","hooks":[{"type":"command","command":"~/.claude/hooks/check-team-spawn.sh"}]}'
+            jq --argjson entry "$HOOK_ENTRY" '
+                .hooks = (.hooks // {}) |
+                .hooks.PreToolUse = ((.hooks.PreToolUse // []) + [$entry])
+            ' "$SETTINGS_FILE" > "${SETTINGS_FILE}.tmp" && mv "${SETTINGS_FILE}.tmp" "$SETTINGS_FILE"
+            log_success "  └─ settings.json にフック設定を追加"
+        else
+            log_info "  └─ settings.json のフック設定確認済み"
+        fi
+    else
+        # settings.json が存在しない場合は新規作成
+        cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Task|TeamCreate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/check-team-spawn.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+SETTINGS_EOF
+        log_success "  └─ settings.json を新規作成（フック設定付き）"
+    fi
+else
+    log_info "  ⚠️  jq 未インストール: settings.json の自動設定をスキップ"
+    log_info "     手動で ~/.claude/settings.json に PreToolUse フックを追加してください"
+fi
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # STEP 4: 前回記録のバックアップ（内容がある場合のみ）
 # ═══════════════════════════════════════════════════════════════════════════════
 BACKUP_DIR="${LOGS_DIR}/backup_$(date '+%Y%m%d_%H%M%S')"

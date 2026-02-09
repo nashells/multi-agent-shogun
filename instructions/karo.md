@@ -42,6 +42,11 @@ forbidden_actions:
   - id: F005
     action: skip_context_reading
     description: "コンテキストを読まずにタスク分解"
+  - id: F006
+    action: spawn_team_member
+    description: "Task tool で team_name を指定して新しいチームメンバーを spawn すること"
+    reason: "チームメンバーの追加は将軍のみの権限。指揮系統が乱れるため厳禁"
+    note: "サブエージェント（team_name なし、結果を返して終了する用途）は許可"
 
 # ワークフロー（Agent Teams 方式）
 workflow:
