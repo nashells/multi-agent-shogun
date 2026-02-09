@@ -243,6 +243,35 @@ $(echo "$task_description" | sed 's/^/      /')
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 将軍セッションID保存（-f モードでない場合）
+# ═══════════════════════════════════════════════════════════════════════════════
+# Claude Code のセッションファイルは ~/.claude/projects/<sanitized-path>/<uuid>.jsonl
+# に保存される。将軍のセッションIDを保存しておくと再出陣時に --continue で復元できる。
+SESSION_ID_FILE="${STATUS_DIR}/shogun_session_id"
+
+if [ "$FORCE_MODE" = false ] && [ "$SHOGUN_EXISTS" = true ]; then
+    # WORK_DIR からセッションディレクトリを導出（/ を - に置換）
+    CLAUDE_PROJECT_DIR="$HOME/.claude/projects/$(echo "$WORK_DIR" | tr '/' '-')"
+
+    if [ -d "$CLAUDE_PROJECT_DIR" ]; then
+        # 最新の .jsonl ファイル（将軍のセッション）を取得
+        LATEST_SESSION=$(ls -t "$CLAUDE_PROJECT_DIR"/*.jsonl 2>/dev/null | head -1)
+        if [ -n "$LATEST_SESSION" ]; then
+            SESSION_ID=$(basename "$LATEST_SESSION" .jsonl)
+            mkdir -p "${STATUS_DIR}"
+            echo "$SESSION_ID" > "$SESSION_ID_FILE"
+            log_info "📎 将軍のセッションID を保存: ${SESSION_ID:0:8}..."
+        fi
+    fi
+elif [ "$FORCE_MODE" = true ]; then
+    # 強制撤退: セッションIDファイルを削除（再開不可にする）
+    if [ -f "$SESSION_ID_FILE" ]; then
+        trash "$SESSION_ID_FILE" 2>/dev/null || true
+        log_info "📎 強制撤退のため、セッションID を破棄"
+    fi
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # 撤退処理
 # ═══════════════════════════════════════════════════════════════════════════════
 log_retreat "🏯 全軍撤退開始..."
@@ -287,8 +316,13 @@ echo -e "\033[1;36m  ╚══════════════════�
 echo ""
 echo "  次回出陣するには:"
 echo "  ┌──────────────────────────────────────────────────────────┐"
-echo "  │  cd ${WORK_DIR} && ${SHOGUN_ROOT}/shutsujin_departure.sh │"
-echo "  │  または: .shogun/bin/shutsujin.sh                        │"
+echo "  │  新規出陣:                                                │"
+echo "  │    .shogun/bin/shutsujin.sh                               │"
+if [ -f "$SESSION_ID_FILE" ]; then
+echo "  │                                                          │"
+echo "  │  前回セッション引き継ぎ:                                  │"
+echo "  │    .shogun/bin/shutsujin.sh --resume                     │"
+fi
 echo "  └──────────────────────────────────────────────────────────┘"
 echo ""
 echo "  ════════════════════════════════════════════════════════════"

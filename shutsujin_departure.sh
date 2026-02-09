@@ -47,9 +47,14 @@ log_war() {
 # ═══════════════════════════════════════════════════════════════════════════════
 # オプション解析
 # ═══════════════════════════════════════════════════════════════════════════════
+RESUME_MODE=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
+        -r|--resume)
+            RESUME_MODE=true
+            shift
+            ;;
         -h|--help)
             echo ""
             echo "🏯 multi-agent-shogun 出陣スクリプト（Agent Teams 版）"
@@ -57,10 +62,12 @@ while [[ $# -gt 0 ]]; do
             echo "使用方法: ./shutsujin_departure.sh [オプション]"
             echo ""
             echo "オプション:"
+            echo "  -r, --resume      前回セッションを引き継いで再出陣（将軍 --continue）"
             echo "  -h, --help        このヘルプを表示"
             echo ""
             echo "例:"
-            echo "  ./shutsujin_departure.sh      # tmux セッション構築 + 将軍起動"
+            echo "  ./shutsujin_departure.sh      # 新規出陣（tmux セッション構築 + 将軍起動）"
+            echo "  ./shutsujin_departure.sh -r   # 再出陣（前回の将軍セッションを引き継ぎ）"
             echo "  .shogun/bin/shogun.sh          # 将軍にアタッチ"
             echo "  .shogun/bin/multiagent.sh      # 配下にアタッチ"
             echo ""
@@ -167,10 +174,26 @@ show_battle_cry() {
 # バナー表示実行
 show_battle_cry
 
-echo -e "  \033[1;33m天下布武！出陣準備を開始いたす\033[0m"
+if [ "$RESUME_MODE" = true ]; then
+    echo -e "  \033[1;33m再出陣！前回の陣を引き継ぐぞ\033[0m"
+else
+    echo -e "  \033[1;33m天下布武！出陣準備を開始いたす\033[0m"
+fi
 echo ""
 log_info "作業ディレクトリ: ${WORK_DIR}"
 log_info "プロジェクト名: ${PROJECT_NAME_SAFE}"
+
+# resume モード時のセッションID確認
+SESSION_ID_FILE="${STATUS_DIR}/shogun_session_id"
+SAVED_SESSION_ID=""
+if [ "$RESUME_MODE" = true ]; then
+    if [ -f "$SESSION_ID_FILE" ]; then
+        SAVED_SESSION_ID=$(cat "$SESSION_ID_FILE")
+        log_info "前回セッションID: ${SAVED_SESSION_ID:0:8}..."
+    else
+        log_info "⚠️  保存済みセッションIDなし（--continue で最新セッションを使用）"
+    fi
+fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -203,11 +226,15 @@ log_success "  └─ project.env 生成完了"
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 3: bin/ ラッパースクリプト生成
 # ═══════════════════════════════════════════════════════════════════════════════
-cat > "${BIN_DIR}/shutsujin.sh" << EOF
+cat > "${BIN_DIR}/shutsujin.sh" << 'WRAPPER_EOF'
 #!/bin/sh
-# 再出陣ラッパー
-cd "${WORK_DIR}" && "${SHOGUN_ROOT}/shutsujin_departure.sh"
-EOF
+# 再出陣ラッパー（引数をパススルー）
+# 使い方:
+#   .shogun/bin/shutsujin.sh           # 新規出陣
+#   .shogun/bin/shutsujin.sh --resume  # 前回セッション引き継ぎ
+WRAPPER_EOF
+# 変数展開が必要な部分を追記
+echo "cd \"${WORK_DIR}\" && \"${SHOGUN_ROOT}/shutsujin_departure.sh\" \"\$@\"" >> "${BIN_DIR}/shutsujin.sh"
 
 cat > "${BIN_DIR}/tettai.sh" << EOF
 #!/bin/sh
@@ -250,13 +277,17 @@ if [ "$NEED_BACKUP" = true ]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 5: ダッシュボード初期化
+# STEP 5: ダッシュボード初期化（resume 時はスキップ）
 # ═══════════════════════════════════════════════════════════════════════════════
-log_info "📊 戦況報告板を初期化中..."
-TIMESTAMP=$(date "+%Y-%m-%d %H:%M")
+if [ "$RESUME_MODE" = true ] && [ -f "${DASHBOARD_PATH}" ]; then
+    log_info "📊 戦況報告板は前回のものを引き継ぎ"
+    echo ""
+else
+    log_info "📊 戦況報告板を初期化中..."
+    TIMESTAMP=$(date "+%Y-%m-%d %H:%M")
 
-if [ "$LANG_SETTING" = "ja" ]; then
-    cat > "${DASHBOARD_PATH}" << EOF
+    if [ "$LANG_SETTING" = "ja" ]; then
+        cat > "${DASHBOARD_PATH}" << EOF
 # 📊 戦況報告
 最終更新: ${TIMESTAMP}
 
@@ -282,8 +313,8 @@ if [ "$LANG_SETTING" = "ja" ]; then
 ## ❓ 伺い事項
 なし
 EOF
-else
-    cat > "${DASHBOARD_PATH}" << EOF
+    else
+        cat > "${DASHBOARD_PATH}" << EOF
 # 📊 戦況報告 (Battle Status Report)
 最終更新 (Last Updated): ${TIMESTAMP}
 
@@ -309,22 +340,15 @@ else
 ## ❓ 伺い事項 (Questions for Lord)
 なし (None)
 EOF
-fi
+    fi
 
-log_success "  └─ ダッシュボード初期化完了 (言語: $LANG_SETTING)"
-echo ""
+    log_success "  └─ ダッシュボード初期化完了 (言語: $LANG_SETTING)"
+    echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 6: 前提コマンド確認
 # ═══════════════════════════════════════════════════════════════════════════════
-
-# Claude Code CLI の存在チェック
-if ! command -v claude &> /dev/null; then
-    log_info "⚠️  claude コマンドが見つかりません"
-    echo "  first_setup.sh を再実行してください:"
-    echo "    ./first_setup.sh"
-    exit 1
-fi
 
 # tmux の存在確認（Agent Teams の teammateMode: tmux に必要）
 if ! command -v tmux &> /dev/null; then
@@ -354,8 +378,19 @@ tmux kill-session -t "${TMUX_SHOGUN}" 2>/dev/null && log_info "  └─ 既存�
 tmux kill-session -t "${TMUX_MULTIAGENT}" 2>/dev/null && log_info "  └─ 既存の ${TMUX_MULTIAGENT} セッション撤収" || true
 
 # 将軍用 tmux セッション（Claude Code を起動）
+# resume モードでは保存済みセッションIDで復元、なければ --continue にフォールバック
+CLAUDE_EXTRA_ARGS=""
+if [ "$RESUME_MODE" = true ]; then
+    if [ -n "$SAVED_SESSION_ID" ]; then
+        CLAUDE_EXTRA_ARGS="--resume ${SAVED_SESSION_ID}"
+        log_info "  └─ セッションID指定で復元（--resume ${SAVED_SESSION_ID:0:8}...）"
+    else
+        CLAUDE_EXTRA_ARGS="--continue"
+        log_info "  └─ セッションIDなし、最新セッションで再開（--continue）"
+    fi
+fi
 tmux new-session -d -s "${TMUX_SHOGUN}" -n "shogun" \
-    "cd '${WORK_DIR}' && WORK_DIR='${WORK_DIR}' SHOGUN_DATA_DIR='${SHOGUN_DATA_DIR}' '${SHOGUN_ROOT}/scripts/claude-shogun' --dangerously-skip-permissions"
+    "cd '${WORK_DIR}' && WORK_DIR='${WORK_DIR}' SHOGUN_DATA_DIR='${SHOGUN_DATA_DIR}' '${SHOGUN_ROOT}/scripts/claude-shogun' --dangerously-skip-permissions ${CLAUDE_EXTRA_ARGS}"
 tmux set-option -t "${TMUX_SHOGUN}" pane-base-index 0
 
 # チームメイト用 tmux セッション（配下の陣）
@@ -367,7 +402,7 @@ INITIAL_PANE=$(tmux display-message -t "${TMUX_MULTIAGENT}:agents" -p '#{pane_id
 # Agent Teams が teammateMode: tmux で pane を作るたび発火する
 # 初回移動時に空の初期 pane を削除する（2回目以降は既に消えているので無視）
 tmux set-hook -t "${TMUX_SHOGUN}" after-split-window \
-    "move-pane -t ${TMUX_MULTIAGENT}:agents ; select-layout -t ${TMUX_MULTIAGENT}:agents tiled ; run-shell -b 'tmux kill-pane -t ${INITIAL_PANE} 2>/dev/null || true'"
+    "move-pane -t ${TMUX_MULTIAGENT}:agents ; run-shell -b '${SHOGUN_ROOT}/scripts/tmux-grid-layout.sh \"${TMUX_MULTIAGENT}:agents\" ; tmux kill-pane -t ${INITIAL_PANE} 2>/dev/null || true'"
 
 log_success "  └─ 将軍の本陣（${TMUX_SHOGUN}）構築完了"
 log_success "  └─ 配下の陣（${TMUX_MULTIAGENT}）構築完了"
@@ -402,9 +437,34 @@ if [ "$READY" = true ]; then
 - 足軽${i}号（ashigaru${i}）: ${SHOGUN_ROOT}/instructions/ashigaru.md を読ませよ"
     done
 
-    # チーム構成の初期プロンプトを送信
-    # claude-shogun が SHOGUN_ROOT 環境変数を export 済み
-    INIT_PROMPT="${SHOGUN_ROOT}/instructions/shogun.md を読んで将軍として起動せよ。${SHOGUN_ROOT}/CLAUDE.md も読め。${SHOGUN_ROOT}/config/settings.yaml で言語設定を確認せよ。
+    if [ "$RESUME_MODE" = true ]; then
+        # ═══════════════════════════════════════════════════════════════════
+        # resume モード: 前回セッションを引き継ぎ、チームだけ再構成
+        # ═══════════════════════════════════════════════════════════════════
+        # 未完了タスクファイルの参照を構成
+        PENDING_TASKS_REF=""
+        if [ -f "${STATUS_DIR}/pending_tasks.yaml" ]; then
+            PENDING_TASKS_REF="
+前回の未完了タスクが ${STATUS_DIR}/pending_tasks.yaml に保存されている。読み込んで TaskCreate で再登録せよ。"
+        fi
+
+        INIT_PROMPT="前回セッションから再開する。${SHOGUN_ROOT}/instructions/shogun.md と ${SHOGUN_ROOT}/CLAUDE.md を再読せよ。${SHOGUN_ROOT}/config/settings.yaml で言語設定を確認せよ。
+
+環境変数 SHOGUN_ROOT=${SHOGUN_ROOT} が設定済みである。
+ダッシュボードのパスは ${DASHBOARD_PATH} である（前回の内容を引き継ぎ済み）。
+プロジェクトデータディレクトリは ${SHOGUN_DATA_DIR} である。
+
+TeamCreate でチーム ${TEAM_NAME} を作成し、以下のチームメイトを Task で spawn せよ:
+- 家老（karo）: ${SHOGUN_ROOT}/instructions/karo.md を読ませよ。mode は delegate にせよ。
+- 目付（metsuke）: ${SHOGUN_ROOT}/instructions/metsuke.md を読ませよ。${ASHIGARU_SPAWN}
+${PENDING_TASKS_REF}
+全員が起動したら、殿の指示を待て。"
+
+    else
+        # ═══════════════════════════════════════════════════════════════════
+        # 通常モード: 新規セッション
+        # ═══════════════════════════════════════════════════════════════════
+        INIT_PROMPT="${SHOGUN_ROOT}/instructions/shogun.md を読んで将軍として起動せよ。${SHOGUN_ROOT}/CLAUDE.md も読め。${SHOGUN_ROOT}/config/settings.yaml で言語設定を確認せよ。
 
 環境変数 SHOGUN_ROOT=${SHOGUN_ROOT} が設定済みである。shogun システムのファイルは全て \$SHOGUN_ROOT 配下にある。
 ダッシュボードのパスは ${DASHBOARD_PATH} である。
@@ -416,10 +476,16 @@ TeamCreate でチーム ${TEAM_NAME} を作成し、以下のチームメイト�
 
 全員が起動したら、殿の指示を待て。"
 
+    fi
+
     tmux send-keys -t "${TMUX_SHOGUN}:shogun" "$INIT_PROMPT"
     sleep 2
     tmux send-keys -t "${TMUX_SHOGUN}:shogun" Enter
-    log_success "  └─ チーム構成指示を送信"
+    if [ "$RESUME_MODE" = true ]; then
+        log_success "  └─ 再開指示を送信（前回セッション引き継ぎ）"
+    else
+        log_success "  └─ チーム構成指示を送信"
+    fi
 else
     log_info "⚠️  将軍の起動に時間がかかっています"
     log_info "  アタッチ後に手動でチーム構成を指示してください"
@@ -428,9 +494,15 @@ fi
 echo ""
 
 echo ""
-echo "  ╔══════════════════════════════════════════════════════════╗"
-echo "  ║  🏯 出陣準備完了！天下布武！                              ║"
-echo "  ╚══════════════════════════════════════════════════════════╝"
+if [ "$RESUME_MODE" = true ]; then
+    echo "  ╔══════════════════════════════════════════════════════════╗"
+    echo "  ║  🏯 再出陣完了！前回の陣を引き継ぐ！                     ║"
+    echo "  ╚══════════════════════════════════════════════════════════╝"
+else
+    echo "  ╔══════════════════════════════════════════════════════════╗"
+    echo "  ║  🏯 出陣準備完了！天下布武！                              ║"
+    echo "  ╚══════════════════════════════════════════════════════════╝"
+fi
 echo ""
 
 echo "  ┌──────────────────────────────────────────────────────────┐"
