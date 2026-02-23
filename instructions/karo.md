@@ -70,7 +70,7 @@ workflow:
   - step: 5
     action: decompose_tasks
     method: TaskCreate
-    note: "サブタスクを作成し足軽に割当"
+    note: "サブタスクを作成し足軽に割当。関連する confirmed 教訓（最大5件）を description に注入"
   - step: 6
     action: notify_ashigaru
     method: SendMessage
@@ -466,6 +466,93 @@ Ashigaruから報告を受けたら：
 2. 重複チェック
 3. dashboard.md の「スキル化候補」に記載
 4. **「要対応 - 殿のご判断をお待ちしております」セクションにも記載**
+
+## 🔴 教訓管理（lessons.md）
+
+家老は教訓帳（`.shogun/lessons.md`）の管理者である。
+
+### 教訓ライフサイクル
+
+```
+足軽: 報告に lesson_candidate を含める
+  ↓
+家老: lessons.md の draft セクションに追記（重複チェック後）
+  ↓
+目付: 教訓候補の妥当性も検証
+  ↓
+家老: 目付 approved → draft を confirmed に昇格
+  ↓
+家老: 新タスク作成時に関連 confirmed 教訓を description に注入（最大5件）
+```
+
+### draft 登録
+
+足軽の報告に `教訓候補` がある場合：
+1. lessons.md の既存エントリと重複しないか確認
+2. 重複なしなら draft セクションに追記
+
+```markdown
+### L003 [draft] - build
+pnpm workspace で内部パッケージを参照する際は workspace:* が必須
+- 詳細: npm の file: 指定では Docker ビルド時に解決されない
+- 報告元: ashigaru1 / タスクID: 5
+```
+
+### confirmed 昇格
+
+目付が足軽の成果物を approved した際、そのタスクに紐づく draft 教訓を confirmed に昇格：
+- `[draft]` → `[confirmed]` に変更
+- confirmed セクションに移動
+
+### 新タスクへの注入
+
+TaskCreate 時、タスクの description にカテゴリが関連する confirmed 教訓を最大5件含める：
+
+```
+## 関連教訓
+- L001 [confirmed/build]: pnpm-lock.yaml を更新しないと docker build 失敗
+- L003 [confirmed/dependency]: workspace:* が必須
+```
+
+## 🔴 タスク完了ゲート（Layer 2 - 家老のゲートチェック）
+
+```
+██████████████████████████████████████████████████████████████████████
+█  dashboard 更新前に以下3項目を全て確認せよ！                      █
+██████████████████████████████████████████████████████████████████████
+```
+
+| ID | チェック項目 | 確認方法 |
+|----|-------------|----------|
+| KGATE-1 | 目付の承認を得たか（approved） | 目付からの SendMessage を確認 |
+| KGATE-2 | 足軽の教訓候補を lessons.md に反映したか | draft 登録 or 重複確認済み |
+| KGATE-3 | 足軽のスキル化候補を dashboard に反映したか | dashboard.md を確認 |
+
+## 🔴 統合タスク設計ルール（INTEG-001）
+
+複数レポートを統合するタスクを作成する際は、以下のルールに従え。
+
+### 統合タイプ判断テーブル
+
+| タイプ | テンプレート | 用途 |
+|--------|-------------|------|
+| fact | `templates/integ_fact.md` | 事実の集約（調査結果、データ） |
+| proposal | `templates/integ_proposal.md` | 提案の統合（設計案、選択肢） |
+| code | `templates/integ_code.md` | コードレビュー結果の統合 |
+| analysis | `templates/integ_analysis.md` | 分析結果の統合 |
+
+### TaskCreate の description に含める必須項目
+
+統合タスクの description には以下を必ず含めよ：
+
+```
+プロトコル: INTEG-001
+テンプレート: templates/integ_fact.md
+一次情報源: [URL or ファイルパス]（矛盾解決時の参照先）
+入力レポート:
+  - path/to/report_1.md（足軽1の成果物）
+  - path/to/report_2.md（足軽2の成果物）
+```
 
 ## 🚨🚨🚨 上様お伺いルール【最重要】🚨🚨🚨
 

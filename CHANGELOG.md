@@ -5,6 +5,21 @@
 
 ## 2026-02-23
 
+- **教訓管理パイプライン**: タスク完了時に教訓を蓄積し次タスクに自動注入する知識循環を導入（参考: simokitafresh/multi-agent-shogun `cc66473`）
+  - `shutsujin_departure.sh`: `.shogun/lessons.md` の初期化処理を追加（存在しない場合のみ作成、resume時は蓄積維持）
+  - `instructions/ashigaru.md`: 報告フォーマットに教訓候補（lesson_candidate）を必須検討項目として追加。判断基準テーブルと報告フォーマットを定義
+  - `instructions/karo.md`: 教訓管理セクション新設。draft登録→confirmed昇格→新タスクへの注入（最大5件）のライフサイクルを定義
+  - `instructions/metsuke.md`: チェック項目に教訓候補の妥当性検証（具体性・再現性・汎用性・カテゴリ適切性）を追加
+  - `CLAUDE.md`: 教訓管理パイプラインの概要とライフサイクルを全エージェント必須ルールとして追加
+- **タスク完了ゲート**: 3層ゲート構造を導入し品質を体系的に担保（参考: simokitafresh/multi-agent-shogun `cc66473`）
+  - `instructions/ashigaru.md`: Layer 1（足軽の自己チェック GATE-1〜4）を追加
+  - `instructions/karo.md`: Layer 2（家老のゲートチェック KGATE-1〜3）を追加
+  - Layer 3 は既存の目付チェック項目に教訓候補チェックを追加して対応
+- **統合矛盾検出プロトコル INTEG-001**: 複数レポート統合時の矛盾検出・解決ルールを定義（参考: saneaki/multi-agent `9ab1e0f`）
+  - `CLAUDE.md`: INTEG-001 プロトコル概要（3ステップ、テンプレート一覧、役割分担）を全エージェント必須ルールとして追加
+  - `instructions/karo.md`: 統合タスク設計ルール（統合タイプ判断テーブル、TaskCreate description 必須項目）を追加
+  - `instructions/ashigaru.md`: 統合タスク実行手順（INTEG-001フロー、Contradiction Resolution セクション必須）を追加
+  - `instructions/metsuke.md`: 統合品質チェック項目（矛盾解決記録・一次情報源参照・情報欠落・論理一貫性）を追加
 - **upstream マージ** (upstream/main `73c4113`): fork 元が 107 コミット先行していたため、汎用的改善を選択的に取り込み。通信基盤（YAML+mailbox, inbox_watcher, ntfy 等）、Multi-CLI対応（Codex/Copilot）、Dynamic Model Routing は除外。
   - 取り込み（`101e062`, `b01d56b` より）:
     - `.claude/settings.json`: `permissions.deny` 追加。破壊的コマンド（`rm -rf /`, `git push --force`, `tmux kill-server` 等）を物理的に拒否

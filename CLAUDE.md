@@ -1,7 +1,7 @@
 # multi-agent-shogun システム構成
 
-> **Version**: 2.1.0
-> **Last Updated**: 2026-02-08
+> **Version**: 2.2.0
+> **Last Updated**: 2026-02-23
 
 ## 概要
 multi-agent-shogunは、Claude Code の **Agent Teams** を使ったマルチエージェント並列開発基盤である。
@@ -175,6 +175,51 @@ multi-agent-shogunは、Claude Code の **Agent Teams** を使ったマルチエ
 4. **品質テンプレート**: タスクには必ず品質ルール（Web検索必須、捏造禁止、不明項目のフォールバック）を含めよ。省略すると100%ゴミ出力になった前例あり
 5. **NG時の状態管理**: リトライ前にデータ状態を確認せよ（git log、エントリ数、ファイル整合性）。破損データは必要に応じてリバート
 
+## 統合矛盾検出プロトコル INTEG-001（全エージェント必須）
+
+複数レポートを統合する際に矛盾を検出・解決するためのプロトコル。
+
+### 3ステップ
+
+1. **事実照合**: 複数レポート間の事実（数値、名称、日付等）を照合
+2. **矛盾解決**: 一次情報源を参照し、正しい値を確定。解決記録を残す
+3. **エスカレーション**: 解決不能な矛盾は家老→将軍にエスカレーション
+
+### テンプレート一覧
+
+| テンプレート | 用途 |
+|-------------|------|
+| `templates/integ_base.md` | 基本テンプレート |
+| `templates/integ_fact.md` | 事実の集約 |
+| `templates/integ_proposal.md` | 提案の統合 |
+| `templates/integ_code.md` | コードレビュー統合 |
+| `templates/integ_analysis.md` | 分析結果の統合 |
+
+### 役割分担
+
+- **家老**: 統合タスク作成時に INTEG-001 と一次情報源を description に記載
+- **足軽**: INTEG-001 記載があるタスクでは矛盾検出・解決を実施し Contradiction Resolution セクションを成果物に含める
+- **目付**: 統合成果物の矛盾解決記録・一次情報源参照・情報欠落・論理一貫性を検証
+
+## 教訓管理パイプライン（全エージェント必須）
+
+タスク完了時に教訓を蓄積し、次タスクに自動注入する知識循環の仕組み。
+
+### ライフサイクル
+
+```
+足軽: 報告に教訓候補を含める → 家老: lessons.md に draft 登録
+→ 目付: 教訓候補の妥当性検証 → 家老: confirmed に昇格
+→ 家老: 新タスクの description に関連教訓を注入（最大5件）
+```
+
+### 教訓帳の場所
+
+- `WORK_DIR/.shogun/lessons.md`（出陣スクリプトが初期化、resume 時は蓄積を維持）
+- ID形式: L001, L002, ...
+- 状態: draft / confirmed
+- カテゴリ: build, design, test, process, dependency, security, performance, other
+
 ## 通信プロトコル: Agent Teams
 
 ### 通信方式
@@ -235,6 +280,7 @@ SHOGUN_ROOT/                               # システムファイル
 WORK_DIR/.shogun/                          # プロジェクト固有データ（実行時生成）
 ├── project.env                            # メタデータ
 ├── dashboard.md                           # ダッシュボード
+├── lessons.md                             # 教訓帳（出陣時初期化、蓄積）
 ├── bin/
 │   ├── shutsujin.sh                       # 再出陣ラッパー
 │   ├── tettai.sh                          # 撤退ラッパー
