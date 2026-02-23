@@ -1,4 +1,26 @@
 {
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf /Users/*)",
+      "Bash(rm -rf ~*)",
+      "Bash(sudo *)",
+      "Bash(su *)",
+      "Bash(kill *)",
+      "Bash(killall *)",
+      "Bash(pkill *)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard*)",
+      "Bash(tmux kill-server*)",
+      "Bash(tmux kill-session*)",
+      "Bash(mkfs*)",
+      "Bash(dd if=*)",
+      "Bash(chmod -R * /)",
+      "Bash(chown -R * /)"
+    ]
+  },
   "spinnerVerbs": {
     "mode": "replace",
     "verbs": [

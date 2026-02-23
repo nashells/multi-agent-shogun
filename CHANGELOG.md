@@ -3,6 +3,16 @@
 [yohey-w/multi-agent-shogun](https://github.com/yohey-w/multi-agent-shogun) の `9e23e2c` からfork。
 以降の変更履歴を記す。
 
+## 2026-02-23
+
+- **upstream マージ** (upstream/main `73c4113`): fork 元が 107 コミット先行していたため、汎用的改善を選択的に取り込み。通信基盤（YAML+mailbox, inbox_watcher, ntfy 等）、Multi-CLI対応（Codex/Copilot）、Dynamic Model Routing は除外。
+  - 取り込み（`101e062`, `b01d56b` より）:
+    - `.claude/settings.json`: `permissions.deny` 追加。破壊的コマンド（`rm -rf /`, `git push --force`, `tmux kill-server` 等）を物理的に拒否
+    - `CLAUDE.md`: 破壊的操作の安全ルール D001-D008（Tier 1 絶対禁止 / Tier 2 停止報告 / Tier 3 安全代替）を追加。WSL2 固有の保護は macOS 用に変更、`inbox_write` は `SendMessage` に読み替え
+    - `CLAUDE.md`: バッチ処理プロトコル追加。30+件の大規模処理で batch1 QC ゲート必須化、バッチサイズ制限、品質テンプレート義務化
+    - `instructions/shogun.md`: クリティカルシンキング（簡易版 Step 2-3）追加。数値の再計算とランタイムシミュレーションを殿への報告前に必須化
+  - 除外: 通信関連（inbox_watcher, ntfy, send-keys, watcher）約43件、Multi-CLI対応約15件、Dynamic Model Routing/Bloom約8件、軍師(gunshi)ロール、generated instructions、CI/CD
+
 ## 2026-02-09
 
 - **セッション再開機能**: 撤退後に前回の将軍セッションを引き継いで再出陣できるようにした
