@@ -453,6 +453,78 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# STEP 5c: セッションログ表示 + ログローテーション
+# ═══════════════════════════════════════════════════════════════════════════════
+# SESSIONS_DIR はローカル定義（project-env.sh と同値の再定義、明示性のため）
+SESSIONS_DIR="${LOGS_DIR}/sessions"
+
+log_info "📜 過去の戦の記録を確認中..."
+
+SESSION_LOG_COUNT=0
+if [ -d "${SESSIONS_DIR}" ]; then
+    SESSION_LOG_COUNT=$(find "${SESSIONS_DIR}" -maxdepth 1 -name 'session_*.md' 2>/dev/null | wc -l)
+fi
+
+if [ "$SESSION_LOG_COUNT" -gt 0 ]; then
+    echo "  ┌──────────────────────────────────────────────────────────┐"
+    echo "  │  📜 直近のセッション記録                                  │"
+    echo "  ├──────────────────────────────────────────────────────────┤"
+
+    idx=0
+    ls -t "${SESSIONS_DIR}"/session_*.md 2>/dev/null | head -3 | while IFS= read -r f; do
+        idx=$((idx + 1))
+        fname=$(basename "$f")
+
+        # session_YYYYMMDD_HHMMSS.md → YYYY-MM-DD HH:MM
+        datetime=$(echo "$fname" | sed -E 's/session_([0-9]{4})([0-9]{2})([0-9]{2})_([0-9]{2})([0-9]{2})[0-9]{2}\.md/\1-\2-\3 \4:\5/')
+
+        # 「戦果」セクションのテーブルデータ行数（ヘッダー・区切り行を除く）= 完了タスク数
+        completed=$(awk '
+            /^## .*戦果/ { in_s=1; next }
+            in_s && /^## / { exit }
+            in_s && /^\|/ { r++ }
+            END { print (r > 2 ? r - 2 : 0) }
+        ' "$f")
+
+        # 「未完了タスク」セクションの項目数
+        pending=$(awk '
+            /^## .*未完了/ { in_s=1; next }
+            in_s && /^## / { exit }
+            in_s && /なし/ { exit }
+            in_s && /^\|/ { r++ }
+            in_s && /^- / { items++ }
+            END { t = (r > 2 ? r - 2 : 0); print t + items + 0 }
+        ' "$f")
+
+        # NOTE: 右端 │ は可変長データ（日本語+数値）のため正確な幅揃えが困難。省略。
+        printf "  │  [%d] %s - 戦果: %d件完了 / 未完了: %d件\n" "$idx" "$datetime" "$completed" "$pending"
+    done
+
+    echo "  └──────────────────────────────────────────────────────────┘"
+    echo "  詳細: cat .shogun/logs/sessions/session_YYYYMMDD_HHMMSS.md"
+else
+    log_info "  └─ 過去のセッションログなし"
+fi
+
+# ログローテーション（上限: 30件）
+# TODO: 将来的に config/settings.yaml に MAX_SESSION_LOGS を移行
+MAX_SESSION_LOGS=30
+if [ -d "${SESSIONS_DIR}" ]; then
+    file_count=$(find "${SESSIONS_DIR}" -maxdepth 1 -name 'session_*.md' 2>/dev/null | wc -l)
+    if [ "$file_count" -gt "$MAX_SESSION_LOGS" ]; then
+        excess=$((file_count - MAX_SESSION_LOGS))
+        if command -v trash &> /dev/null; then
+            # 古い順（ls -t の逆順 = tail）で超過分を trash
+            ls -t "${SESSIONS_DIR}"/session_*.md | tail -n "$excess" | while IFS= read -r f; do trash "$f"; done
+            log_info "  └─ ログローテーション: ${excess}件の古いログを整理"
+        else
+            log_info "  ⚠️  trash コマンドが見つかりません。ログローテーションをスキップ"
+        fi
+    fi
+fi
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # STEP 6: 前提コマンド確認
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -582,7 +654,7 @@ TeamCreate でチーム ${TEAM_NAME} を作成し、以下のチームメイト�
 
 次のファイルを読み込んでプロジェクト概要を把握せよ。
 CLAUDE.md
-${DASHBOARD_PATH}/project_context.md
+${SHOGUN_DATA_DIR}/project_context.md
 
 全員が起動したら、殿の指示を待て。"
 
