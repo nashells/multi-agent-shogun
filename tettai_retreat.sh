@@ -60,8 +60,8 @@ while [[ $# -gt 0 ]]; do
             echo "  ./tettai_retreat.sh -f                       # 強制撤退（即座に終了）"
             echo ""
             echo "WORK_DIR 発見ロジック:"
-            echo "  1. \$(pwd)/.shogun が存在すればカレントディレクトリ"
-            echo "  2. --project-dir= で指定されたディレクトリ"
+            echo "  1. --project-dir= で指定されたディレクトリ（.shogun/ が存在する場合）"
+            echo "  2. \$(pwd)/.shogun が存在すればカレントディレクトリ"
             echo "  3. フォールバック: SHOGUN_ROOT"
             echo ""
             exit 0
@@ -186,13 +186,13 @@ if [ "$FORCE_MODE" = false ]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 未完了タスク保存（-f モードでも実行）
+# 未完了タスク情報の収集（セッションログ・未完了タスク保存で共用）
 # ═══════════════════════════════════════════════════════════════════════════════
-if [ -d "$TASK_DIR" ]; then
-    PENDING_YAML="${STATUS_DIR}/pending_tasks.yaml"
-    PENDING_COUNT=0
-    PENDING_ENTRIES=""
+PENDING_COUNT=0
+PENDING_ENTRIES=""
+PENDING_TASKS_MD=""
 
+if [ -d "$TASK_DIR" ] && command -v jq &>/dev/null; then
     for task_file in "$TASK_DIR"/*.json; do
         [ -f "$task_file" ] || continue
 
@@ -205,41 +205,111 @@ if [ -d "$TASK_DIR" ]; then
         task_owner=$(jq -r '.owner // empty' "$task_file" 2>/dev/null) || true
         task_blocked_by=$(jq -r '(.blockedBy // []) | map(tostring) | join(", ")' "$task_file" 2>/dev/null) || true
 
-        # ダブルクォートをエスケープ
-        task_id="${task_id//\"/\\\"}"
-        task_subject="${task_subject//\"/\\\"}"
-        task_owner="${task_owner//\"/\\\"}"
-        task_status="${task_status//\"/\\\"}"
+        # バックスラッシュ・ダブルクォートをエスケープ（YAML用）
+        task_id_esc="${task_id//\\/\\\\}"
+        task_id_esc="${task_id_esc//\"/\\\"}"
+        task_subject_esc="${task_subject//\\/\\\\}"
+        task_subject_esc="${task_subject_esc//\"/\\\"}"
+        task_owner_esc="${task_owner//\\/\\\\}"
+        task_owner_esc="${task_owner_esc//\"/\\\"}"
+        task_status_esc="${task_status//\\/\\\\}"
+        task_status_esc="${task_status_esc//\"/\\\"}"
 
-        # YAML エントリを構築（description はリテラルブロックで出力）
-        PENDING_ENTRIES="${PENDING_ENTRIES}  - id: \"${task_id}\"
-    subject: \"${task_subject}\"
+        # YAML エントリを構築（pending_tasks.yaml 用、description はリテラルブロック）
+        PENDING_ENTRIES="${PENDING_ENTRIES}  - id: \"${task_id_esc}\"
+    subject: \"${task_subject_esc}\"
     description: |
 $(echo "$task_description" | sed 's/^/      /')
-    owner: \"${task_owner}\"
-    status: \"${task_status}\"
+    owner: \"${task_owner_esc}\"
+    status: \"${task_status_esc}\"
     blockedBy: [${task_blocked_by}]
+"
+        # Markdown エントリ（セッションログ用）
+        PENDING_TASKS_MD="${PENDING_TASKS_MD}- #${task_id} ${task_subject} (owner: ${task_owner}, status: ${task_status})
 "
         PENDING_COUNT=$((PENDING_COUNT + 1))
     done
+elif [ -d "$TASK_DIR" ] && ! command -v jq &>/dev/null; then
+    echo "WARNING: jq が未インストール。未完了タスクの収集をスキップします" >&2
+fi
 
-    if [ "$PENDING_COUNT" -gt 0 ]; then
-        mkdir -p "${STATUS_DIR}"
-        SAVED_AT=$(date "+%Y-%m-%d %H:%M")
-        {
-            echo "# 未完了タスク一覧（撤退時自動保存）"
-            echo "# 再出陣時に将軍が読み込み、家老にタスクを再割り当てする"
-            echo "saved_at: \"${SAVED_AT}\""
-            echo "tasks:"
-            printf '%s' "$PENDING_ENTRIES"
-        } > "$PENDING_YAML"
-        log_info "📜 未完了の陣立て ${PENDING_COUNT} 件を保存いたした"
-        log_success "  └─ 保存先: ${PENDING_YAML}"
-        echo ""
-    else
-        log_info "📜 未完了の陣立てなし（全任務完了済み）"
-        echo ""
+# ═══════════════════════════════════════════════════════════════════════════════
+# セッションログ保存（-f モードでも実行）
+# ═══════════════════════════════════════════════════════════════════════════════
+log_info "📝 セッションログを保存中..."
+mkdir -p "${SESSIONS_DIR}"
+_now=$(date '+%Y%m%d_%H%M%S')
+SESSION_TIMESTAMP="$_now"
+SESSION_DATETIME="${_now:0:4}-${_now:4:2}-${_now:6:2} ${_now:9:2}:${_now:11:2}:${_now:13:2}"
+SESSION_DATETIME_SHORT="${SESSION_DATETIME%:*}"
+SESSION_LOG="${SESSIONS_DIR}/session_${SESSION_TIMESTAMP}.md"
+
+# 戦果（完了タスク）の抽出
+SENKA_CONTENT="なし"
+if [ -f "${DASHBOARD_PATH}" ]; then
+    SENKA_TABLE=$(awk '/^## ✅ 本日の戦果/{found=1; next} /^## /{if(found) exit} found{print}' "${DASHBOARD_PATH}")
+    # テーブルのデータ行をカウント（ヘッダ行+セパレータ行=2、データ行があれば3以上）
+    SENKA_DATA_ROWS=$(echo "$SENKA_TABLE" | grep -cE '^\|' || true)
+    if [ "$SENKA_DATA_ROWS" -gt 2 ]; then
+        SENKA_CONTENT="$SENKA_TABLE"
     fi
+fi
+
+# 未完了タスクの Markdown
+if [ "$PENDING_COUNT" -gt 0 ]; then
+    PENDING_MD_CONTENT="${PENDING_TASKS_MD}"
+else
+    PENDING_MD_CONTENT="なし"
+fi
+
+# ダッシュボード最終状態
+if [ -f "${DASHBOARD_PATH}" ]; then
+    DASHBOARD_CONTENT=$(cat "${DASHBOARD_PATH}")
+else
+    DASHBOARD_CONTENT="ダッシュボードなし"
+fi
+
+# セッションログ生成
+{
+    echo "# セッションログ ${SESSION_DATETIME_SHORT}"
+    echo ""
+    echo "- 撤退時刻: ${SESSION_DATETIME}"
+    echo "- プロジェクト: ${PROJECT_NAME_SAFE}"
+    echo "- 作業ディレクトリ: ${WORK_DIR}"
+    echo ""
+    echo "## 戦果（完了タスク）"
+    printf '%s\n' "${SENKA_CONTENT}"
+    echo ""
+    echo "## 未完了タスク"
+    printf '%s\n' "${PENDING_MD_CONTENT}"
+    echo ""
+    echo "## ダッシュボード最終状態"
+    printf '%s\n' "${DASHBOARD_CONTENT}"
+} > "${SESSION_LOG}"
+
+log_success "  └─ セッションログ保存完了: ${SESSION_LOG}"
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 未完了タスク保存（-f モードでも実行）
+# ═══════════════════════════════════════════════════════════════════════════════
+if [ "$PENDING_COUNT" -gt 0 ]; then
+    PENDING_YAML="${STATUS_DIR}/pending_tasks.yaml"
+    mkdir -p "${STATUS_DIR}"
+    SAVED_AT=$(date "+%Y-%m-%d %H:%M")
+    {
+        echo "# 未完了タスク一覧（撤退時自動保存）"
+        echo "# 再出陣時に将軍が読み込み、家老にタスクを再割り当てする"
+        echo "saved_at: \"${SAVED_AT}\""
+        echo "tasks:"
+        printf '%s' "$PENDING_ENTRIES"
+    } > "$PENDING_YAML"
+    log_info "📜 未完了の陣立て ${PENDING_COUNT} 件を保存いたした"
+    log_success "  └─ 保存先: ${PENDING_YAML}"
+    echo ""
+else
+    log_info "📜 未完了の陣立てなし（全任務完了済み）"
+    echo ""
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -280,13 +350,13 @@ echo ""
 # STEP 1: tmux セッション終了（Claude Code プロセスも終了する）
 if [ "$MULTIAGENT_EXISTS" = true ]; then
     log_retreat "  └─ 家老・目付・足軽の陣を撤収中..."
-    tmux kill-session -t "${TMUX_MULTIAGENT}" 2>/dev/null
+    tmux kill-session -t "${TMUX_MULTIAGENT}" 2>/dev/null || true
     log_success "     └─ ${TMUX_MULTIAGENT} 陣、撤収完了"
 fi
 
 if [ "$SHOGUN_EXISTS" = true ]; then
     log_retreat "  └─ 将軍の本陣を撤収中..."
-    tmux kill-session -t "${TMUX_SHOGUN}" 2>/dev/null
+    tmux kill-session -t "${TMUX_SHOGUN}" 2>/dev/null || true
     log_success "     └─ ${TMUX_SHOGUN} 本陣、撤収完了"
 fi
 
